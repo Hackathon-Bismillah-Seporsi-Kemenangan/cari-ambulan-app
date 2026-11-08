@@ -1,7 +1,9 @@
 import 'package:cari_ambulan_app/features/auth/domain/auth_models.dart';
 import 'package:cari_ambulan_app/features/auth/presentation/pages/login_page.dart';
 import 'package:cari_ambulan_app/features/auth/presentation/providers/auth_provider.dart';
+import 'package:cari_ambulan_app/features/driver/domain/driver_models.dart';
 import 'package:cari_ambulan_app/features/driver/presentation/pages/driver_shell.dart';
+import 'package:cari_ambulan_app/features/driver/presentation/providers/driver_home_provider.dart';
 import 'package:cari_ambulan_app/features/user/presentation/pages/user_shell.dart';
 import 'package:cari_ambulan_app/main.dart';
 import 'package:flutter/material.dart';
@@ -60,10 +62,24 @@ void main() {
         roles: ['driver'],
       );
 
+      const driverProfile = DriverProfile(
+        id: 'driver-123',
+        name: 'Pak Supir',
+        vehiclePlate: 'B 1199 SGM',
+        vehicleType: 'Ambulans ALS',
+        hospitalName: 'RS Medika',
+        availabilityStatus: DriverAvailability.offline,
+      );
+
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             authProvider.overrideWith(() => _FakeAuthNotifier(driver)),
+            driverHomeProvider.overrideWith(
+              () => _FakeDriverHomeNotifier(
+                const DriverHomeState(profile: driverProfile),
+              ),
+            ),
           ],
           child: const MaterialApp(home: AuthGate()),
         ),
@@ -71,7 +87,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(DriverShell), findsOneWidget);
-      expect(find.text('Selamat Datang, Pak Supir!'), findsOneWidget);
+      expect(find.text('Pak Supir'), findsOneWidget);
+      expect(find.text('TIDAK AKTIF (OFFLINE)'), findsOneWidget);
     });
 
     testWidgets('AuthGate displays UserShell when patient is logged in', (tester) async {
@@ -105,4 +122,13 @@ class _FakeAuthNotifier extends AuthNotifier {
 
   @override
   Future<AuthUser?> build() async => _initialUser;
+}
+
+class _FakeDriverHomeNotifier extends DriverHomeNotifier {
+  _FakeDriverHomeNotifier(this._initialState);
+
+  final DriverHomeState _initialState;
+
+  @override
+  Future<DriverHomeState> build() async => _initialState;
 }
