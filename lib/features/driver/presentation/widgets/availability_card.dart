@@ -9,16 +9,22 @@ class AvailabilityCard extends StatelessWidget {
     required this.profile,
     required this.isUpdating,
     required this.onToggle,
+    this.lastBeaconLat,
+    this.lastBeaconLng,
   });
 
   final DriverProfile profile;
   final bool isUpdating;
   final VoidCallback onToggle;
+  final double? lastBeaconLat;
+  final double? lastBeaconLng;
 
   @override
   Widget build(BuildContext context) {
     final isOnline = profile.isOnline;
     final statusColor = isOnline ? AppColors.success : AppColors.textSecondary;
+    final lat = lastBeaconLat ?? profile.currentLatitude;
+    final lng = lastBeaconLng ?? profile.currentLongitude;
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -125,6 +131,32 @@ class AvailabilityCard extends StatelessWidget {
               ),
             ],
           ),
+
+          // Live GPS Beacon Info
+          if (isOnline && lat != null && lng != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.my_location, size: 14, color: AppColors.success),
+                  const SizedBox(width: 6),
+                  Text(
+                    'GPS Aktif: ${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)} (Update otomatis)',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.success,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

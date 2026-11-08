@@ -8,5 +8,7 @@ abstract class DriverRepository {
     double? latitude,
     double? longitude,
   });
+
+  Future<void> sendLocation(double latitude, double longitude);
 }
 

@@ -34,4 +34,12 @@ class ApiDriverRepository implements DriverRepository {
     final data = json!['data'] as Map<String, dynamic>;
     return DriverProfile.fromJson(data);
   }
+
+  @override
+  Future<void> sendLocation(double latitude, double longitude) async {
+    await _client.post('driver/location', {
+      'latitude': latitude,
+      'longitude': longitude,
+    });
+  }
 }

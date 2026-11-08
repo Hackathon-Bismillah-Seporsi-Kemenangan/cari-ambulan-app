@@ -131,6 +131,8 @@ class DriverShell extends ConsumerWidget {
                   AvailabilityCard(
                     profile: profile,
                     isUpdating: state.isUpdating,
+                    lastBeaconLat: state.lastBeaconLatitude,
+                    lastBeaconLng: state.lastBeaconLongitude,
                     onToggle: () {
                       ref.read(driverHomeProvider.notifier).toggleAvailability();
                     },

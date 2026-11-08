@@ -27,6 +27,14 @@ class _MockDriverRepository implements DriverRepository {
     );
     return _profile;
   }
+
+  @override
+  Future<void> sendLocation(double latitude, double longitude) async {
+    _profile = _profile.copyWith(
+      currentLatitude: latitude,
+      currentLongitude: longitude,
+    );
+  }
 }
 
 void main() {
