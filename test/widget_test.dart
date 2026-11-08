@@ -1,30 +1,108 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
+import 'package:cari_ambulan_app/features/auth/domain/auth_models.dart';
+import 'package:cari_ambulan_app/features/auth/presentation/pages/login_page.dart';
+import 'package:cari_ambulan_app/features/auth/presentation/providers/auth_provider.dart';
+import 'package:cari_ambulan_app/features/driver/presentation/pages/driver_shell.dart';
+import 'package:cari_ambulan_app/features/user/presentation/pages/user_shell.dart';
+import 'package:cari_ambulan_app/main.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:cari_ambulan_app/main.dart';
-
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('Auth Domain Model Tests', () {
+    test('AuthUser correctly identifies driver role', () {
+      final user = AuthUser.fromJson({
+        'id': 'uuid-driver-1',
+        'full_name': 'Budi Santoso',
+        'email': 'driver@cariambulan.id',
+        'phone': '081200001199',
+        'roles': ['driver'],
+      });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+      expect(user.id, 'uuid-driver-1');
+      expect(user.fullName, 'Budi Santoso');
+      expect(user.isDriver, isTrue);
+      expect(user.isUser, isFalse);
+    });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    test('AuthUser correctly identifies user/patient role', () {
+      final user = AuthUser.fromJson({
+        'id': 'uuid-patient-1',
+        'full_name': 'Siti Rahmawati',
+        'email': 'pasien@cariambulan.id',
+        'phone': '081234567890',
+        'roles': ['user'],
+      });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+      expect(user.isDriver, isFalse);
+      expect(user.isUser, isTrue);
+    });
   });
+
+  group('Widget & UI Tests', () {
+    testWidgets('LoginPage renders correctly when unauthenticated', (tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(home: LoginPage()),
+        ),
+      );
+
+      expect(find.text('CariAmbulan'), findsOneWidget);
+      expect(find.text('Masuk'), findsOneWidget);
+      expect(find.byType(TextFormField), findsNWidgets(2));
+    });
+
+    testWidgets('AuthGate displays DriverShell when driver is logged in', (tester) async {
+      const driver = AuthUser(
+        id: 'driver-123',
+        fullName: 'Pak Supir',
+        email: 'driver@cariambulan.id',
+        roles: ['driver'],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith(() => _FakeAuthNotifier(driver)),
+          ],
+          child: const MaterialApp(home: AuthGate()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(DriverShell), findsOneWidget);
+      expect(find.text('Selamat Datang, Pak Supir!'), findsOneWidget);
+    });
+
+    testWidgets('AuthGate displays UserShell when patient is logged in', (tester) async {
+      const patient = AuthUser(
+        id: 'patient-123',
+        fullName: 'Ibu Pasien',
+        email: 'pasien@cariambulan.id',
+        roles: ['user'],
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith(() => _FakeAuthNotifier(patient)),
+          ],
+          child: const MaterialApp(home: AuthGate()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(UserShell), findsOneWidget);
+      expect(find.text('Halo, Ibu Pasien!'), findsOneWidget);
+    });
+  });
+}
+
+class _FakeAuthNotifier extends AuthNotifier {
+  _FakeAuthNotifier(this._initialUser);
+
+  final AuthUser? _initialUser;
+
+  @override
+  Future<AuthUser?> build() async => _initialUser;
 }
