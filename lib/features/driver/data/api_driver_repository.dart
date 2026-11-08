@@ -67,4 +67,24 @@ class ApiDriverRepository implements DriverRepository {
   Future<void> declineOffer(int offerId) async {
     await _client.post('driver/offers/$offerId/decline');
   }
+
+  @override
+  Future<EmergencyRequestModel?> getActiveTrip() async {
+    final response = await _client.get('driver/trip/current');
+    final data = response?['data'] as Map<String, dynamic>?;
+    if (data == null) return null;
+    return EmergencyRequestModel.fromJson(data);
+  }
+
+  @override
+  Future<EmergencyRequestModel> updateTripStatus(String status) async {
+    final response = await _client.put('driver/trip/status', {
+      'status': status,
+    });
+    final data = response?['data'] as Map<String, dynamic>?;
+    if (data == null) {
+      throw const ApiException('Gagal memperbarui status perjalanan');
+    }
+    return EmergencyRequestModel.fromJson(data);
+  }
 }

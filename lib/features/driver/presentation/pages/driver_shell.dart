@@ -6,6 +6,7 @@ import '../../../auth/domain/auth_models.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/driver_home_provider.dart';
 import '../providers/driver_offer_provider.dart';
+import '../widgets/active_trip_card.dart';
 import '../widgets/availability_card.dart';
 import '../widgets/incoming_call_dialog.dart';
 
@@ -140,6 +141,9 @@ class DriverShell extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
+
+                  // Active Emergency Trip Card (if driver is currently serving one)
+                  const ActiveTripCard(),
 
                   // Availability Card (Online / Offline Toggle)
                   AvailabilityCard(

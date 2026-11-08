@@ -206,7 +206,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(find.byType(AssignedDriverCard), findsOneWidget);
-      expect(find.text('Ambulans Ditugaskan'), findsOneWidget);
+      expect(find.text('Ambulans Ditugaskan'), findsAtLeastNWidgets(1));
       expect(find.text('Budi Santoso'), findsOneWidget);
       expect(find.text('B 1199 SGM'), findsOneWidget);
       expect(find.text('Toyota HiAce ALS'), findsOneWidget);

@@ -21,5 +21,11 @@ abstract class DriverRepository {
 
   /// Decline an emergency offer.
   Future<void> declineOffer(int offerId);
+
+  /// Fetch active emergency trip currently being served by this driver.
+  Future<EmergencyRequestModel?> getActiveTrip();
+
+  /// Progress the status of the current emergency trip.
+  Future<EmergencyRequestModel> updateTripStatus(String status);
 }
 
