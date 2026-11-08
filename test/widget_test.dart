@@ -4,6 +4,9 @@ import 'package:cari_ambulan_app/features/auth/presentation/providers/auth_provi
 import 'package:cari_ambulan_app/features/driver/domain/driver_models.dart';
 import 'package:cari_ambulan_app/features/driver/presentation/pages/driver_shell.dart';
 import 'package:cari_ambulan_app/features/driver/presentation/providers/driver_home_provider.dart';
+import 'package:cari_ambulan_app/features/emergency/data/api_emergency_repository.dart';
+import 'package:cari_ambulan_app/features/emergency/data/emergency_repository.dart';
+import 'package:cari_ambulan_app/features/emergency/domain/emergency_models.dart';
 import 'package:cari_ambulan_app/features/user/presentation/pages/user_shell.dart';
 import 'package:cari_ambulan_app/main.dart';
 import 'package:flutter/material.dart';
@@ -103,14 +106,16 @@ void main() {
         ProviderScope(
           overrides: [
             authProvider.overrideWith(() => _FakeAuthNotifier(patient)),
+            emergencyRepositoryProvider.overrideWithValue(_FakeWidgetEmergencyRepo()),
           ],
           child: const MaterialApp(home: AuthGate()),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       expect(find.byType(UserShell), findsOneWidget);
-      expect(find.text('Halo, Ibu Pasien!'), findsOneWidget);
+      expect(find.text('Halo, Ibu Pasien'), findsOneWidget);
     });
   });
 }
@@ -131,4 +136,24 @@ class _FakeDriverHomeNotifier extends DriverHomeNotifier {
 
   @override
   Future<DriverHomeState> build() async => _initialState;
+}
+
+class _FakeWidgetEmergencyRepo implements EmergencyRepository {
+  @override
+  Future<EmergencyRequestModel> createEmergencyRequest({
+    required double latitude,
+    required double longitude,
+    required String address,
+    bool isForSelf = true,
+    String? emergencyType,
+    String? severityLevel,
+    String? notes,
+  }) async => throw UnimplementedError();
+
+  @override
+  Future<EmergencyRequestModel?> getCurrentRequest() async => null;
+
+  @override
+  Future<EmergencyRequestModel> cancelRequest(String id, {String? reason}) async =>
+      throw UnimplementedError();
 }

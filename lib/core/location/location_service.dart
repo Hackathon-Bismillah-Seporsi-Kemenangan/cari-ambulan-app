@@ -1,5 +1,10 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
+
+final locationServiceProvider = Provider<LocationService>((ref) {
+  return LocationService();
+});
 
 class LocationService {
   // Default fallback (Jakarta Pusat / Monas area)
@@ -47,5 +52,9 @@ class LocationService {
     }
     return (latitude: defaultLatitude, longitude: defaultLongitude);
   }
-}
 
+  Future<String> getAddressFromCoordinates(double latitude, double longitude) async {
+    // In demo / hackathon mode, return readable approximate address
+    return 'Jl. Medan Merdeka Barat No. 17, Jakarta Pusat ($latitude, $longitude)';
+  }
+}

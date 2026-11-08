@@ -9,10 +9,6 @@ import '../../data/api_driver_repository.dart';
 import '../../data/driver_repository.dart';
 import '../../domain/driver_models.dart';
 
-final locationServiceProvider = Provider<LocationService>((ref) {
-  return LocationService();
-});
-
 final driverRepositoryProvider = Provider<DriverRepository>((ref) {
   ref.watch(authProvider.select((auth) => auth.value?.id));
   return ApiDriverRepository(ref.watch(apiClientProvider));

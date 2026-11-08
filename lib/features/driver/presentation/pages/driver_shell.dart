@@ -5,7 +5,9 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../auth/domain/auth_models.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/driver_home_provider.dart';
+import '../providers/driver_offer_provider.dart';
 import '../widgets/availability_card.dart';
+import '../widgets/incoming_call_dialog.dart';
 
 class DriverShell extends ConsumerWidget {
   const DriverShell({super.key, required this.user});
@@ -14,6 +16,16 @@ class DriverShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen<AsyncValue<DriverHomeState>>(driverHomeProvider, (prev, next) {
+      final isOnline = next.value?.profile.isOnline ?? false;
+      final wasOnline = prev?.value?.profile.isOnline ?? false;
+      if (isOnline && !wasOnline) {
+        ref.read(driverOfferProvider.notifier).startPolling();
+      } else if (!isOnline && wasOnline) {
+        ref.read(driverOfferProvider.notifier).stopPolling();
+      }
+    });
+
     final driverState = ref.watch(driverHomeProvider);
 
     return Scaffold(
@@ -60,14 +72,16 @@ class DriverShell extends ConsumerWidget {
         data: (state) {
           final profile = state.profile;
 
-          return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(driverHomeProvider),
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+          return Stack(
+            children: [
+              RefreshIndicator(
+                onRefresh: () async => ref.invalidate(driverHomeProvider),
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                   // Driver Info Header
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -209,8 +223,11 @@ class DriverShell extends ConsumerWidget {
                 ],
               ),
             ),
-          );
-        },
+          ),
+          const IncomingCallDialog(),
+        ],
+      );
+    },
       ),
     );
   }

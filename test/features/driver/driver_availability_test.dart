@@ -1,7 +1,9 @@
 import 'package:cari_ambulan_app/features/driver/data/driver_repository.dart';
+import 'package:cari_ambulan_app/features/driver/domain/dispatch_offer_model.dart';
 import 'package:cari_ambulan_app/features/driver/domain/driver_models.dart';
 import 'package:cari_ambulan_app/features/driver/presentation/providers/driver_home_provider.dart';
 import 'package:cari_ambulan_app/features/driver/presentation/widgets/availability_card.dart';
+import 'package:cari_ambulan_app/features/emergency/domain/emergency_models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -35,6 +37,15 @@ class _MockDriverRepository implements DriverRepository {
       currentLongitude: longitude,
     );
   }
+
+  @override
+  Future<DispatchOfferModel?> getCurrentOffer() async => null;
+
+  @override
+  Future<EmergencyRequestModel> acceptOffer(int offerId) async => throw UnimplementedError();
+
+  @override
+  Future<void> declineOffer(int offerId) async {}
 }
 
 void main() {
