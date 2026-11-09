@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:cari_ambulan_app/features/driver/data/routing_repository.dart';
 import 'package:cari_ambulan_app/features/driver/domain/route_models.dart';
+import 'package:cari_ambulan_app/features/driver/presentation/widgets/maneuver_banner.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -123,5 +124,11 @@ void main() {
     expect(route.isEstimate, isTrue);
     expect(route.points, [_from, _to]);
     expect(route.distanceMeters, greaterThan(1000));
+  });
+
+  test('formats distances like a navigation app', () {
+    expect(formatDistance(43), '40 m');
+    expect(formatDistance(312), '300 m');
+    expect(formatDistance(1840), '1.8 km');
   });
 }

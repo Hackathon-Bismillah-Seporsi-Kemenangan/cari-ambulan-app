@@ -13,6 +13,8 @@ class AppColors {
   static const Color ambulance = Color(0xFFD32F2F); // Emergency red
   static const Color ambulanceLight = Color(0xFFEF5350); // Light red
   static const Color ambulanceDark = Color(0xFFB71C1C); // Dark red
+  static const Color ambulanceSurface = Color(0xFFFDECEA); // Red tint
+  static const Color primarySurface = Color(0xFFE3F2FD); // Blue tint
 
   // Neutral
   static const Color white = Color(0xFFFFFFFF);
@@ -26,6 +28,7 @@ class AppColors {
   // Status colors
   static const Color success = Color(0xFF2E7D32);
   static const Color warning = Color(0xFFF57F17);
+  static const Color warningSurface = Color(0xFFFFF8E1);
   static const Color error = Color(0xFFC62828);
   static const Color info = Color(0xFF0277BD);
 

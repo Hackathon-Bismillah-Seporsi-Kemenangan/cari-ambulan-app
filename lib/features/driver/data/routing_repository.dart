@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +11,24 @@ import '../domain/route_models.dart';
 final routingRepositoryProvider = Provider<RoutingRepository>((ref) {
   return OsrmRoutingRepository();
 });
+
+/// Driving route between two points, cached while a screen shows it.
+///
+/// A straight-line estimate (routing unreachable) is retried every
+/// [routeRetryInterval], so one failed request doesn't leave the driver
+/// without directions until they've moved far enough to re-route.
+final routeProvider = FutureProvider.autoDispose
+    .family<DriveRoute, ({LatLng from, LatLng to})>((ref, leg) async {
+  final route =
+      await ref.watch(routingRepositoryProvider).fetchRoute(leg.from, leg.to);
+  if (route.isEstimate) {
+    final retry = Timer(routeRetryInterval, ref.invalidateSelf);
+    ref.onDispose(retry.cancel);
+  }
+  return route;
+});
+
+const routeRetryInterval = Duration(seconds: 10);
 
 /// Turn-by-turn driving routes.
 abstract interface class RoutingRepository {

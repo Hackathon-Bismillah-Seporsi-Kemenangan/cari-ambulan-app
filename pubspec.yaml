@@ -42,6 +42,7 @@ dependencies:
   vector_map_tiles: ^9.0.0-beta.13
   vector_tile_renderer: ^6.1.0
   path_provider: ^2.1.6
+  url_launcher: ^6.3.3
 
 dev_dependencies:
   flutter_test:

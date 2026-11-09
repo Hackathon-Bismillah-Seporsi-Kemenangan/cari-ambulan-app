@@ -8,10 +8,12 @@ import '../../../auth/domain/auth_models.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/driver_home_provider.dart';
 import '../providers/driver_offer_provider.dart';
+import '../providers/driver_trip_provider.dart';
 import '../widgets/active_trip_card.dart';
 import '../widgets/availability_card.dart';
 import '../widgets/driver_location_card.dart';
 import '../widgets/incoming_call_dialog.dart';
+import 'trip_navigation_page.dart';
 
 class DriverShell extends ConsumerWidget {
   const DriverShell({super.key, required this.user});
@@ -27,6 +29,14 @@ class DriverShell extends ConsumerWidget {
         ref.read(driverOfferProvider.notifier).startPolling();
       } else if (!isOnline && wasOnline) {
         ref.read(driverOfferProvider.notifier).stopPolling();
+      }
+    });
+
+    // Open navigation when a trip starts: just accepted, or resumed after
+    // the app was closed mid-trip.
+    ref.listen<DriverTripState>(driverTripProvider, (prev, next) {
+      if (!(prev?.hasActiveTrip ?? false) && next.hasActiveTrip) {
+        TripNavigationPage.open(context);
       }
     });
 

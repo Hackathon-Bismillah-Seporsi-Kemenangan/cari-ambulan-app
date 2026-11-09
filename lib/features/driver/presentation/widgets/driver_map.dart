@@ -18,6 +18,7 @@ class DriverMap extends StatelessWidget {
     this.route = const [],
     this.destination,
     this.onMapReady,
+    this.showAttribution = true,
   });
 
   final MapController controller;
@@ -30,6 +31,9 @@ class DriverMap extends StatelessWidget {
   /// Pickup or hospital, shown as a blue location dot.
   final LatLng? destination;
   final VoidCallback? onMapReady;
+
+  /// Off when the screen shows the attribution itself, e.g. above a sheet.
+  final bool showAttribution;
 
   @override
   Widget build(BuildContext context) {
@@ -90,9 +94,10 @@ class DriverMap extends StatelessWidget {
             ),
           ],
         ),
-        const SimpleAttributionWidget(
-          source: Text(MapTiles.attribution, style: TextStyle(fontSize: 10)),
-        ),
+        if (showAttribution)
+          const SimpleAttributionWidget(
+            source: Text(MapTiles.attribution, style: TextStyle(fontSize: 10)),
+          ),
       ],
     );
   }

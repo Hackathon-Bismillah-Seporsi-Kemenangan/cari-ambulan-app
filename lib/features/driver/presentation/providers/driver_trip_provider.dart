@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/logging/app_log.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../emergency/domain/emergency_models.dart';
 import '../../data/driver_repository.dart';
 import 'driver_home_provider.dart';
@@ -17,6 +20,8 @@ class DriverTripState {
   final String? error;
 
   bool get hasActiveTrip => trip != null && trip!.status.isActiveTrip;
+
+  bool get wasCancelled => trip?.status == EmergencyRequestStatus.cancelled;
 
   DriverTripState copyWith({
     EmergencyRequestModel? trip,
@@ -42,16 +47,34 @@ class DriverTripNotifier extends StateNotifier<DriverTripState> {
   DriverTripNotifier(this._repository, this._ref)
       : super(const DriverTripState()) {
     loadActiveTrip();
+    // The patient can cancel at any time; nothing else tells the driver.
+    _syncTimer = Timer.periodic(syncInterval, (_) {
+      if (state.hasActiveTrip && !state.isUpdating) loadActiveTrip();
+    });
   }
+
+  static const syncInterval = Duration(seconds: 5);
 
   final DriverRepository _repository;
   final Ref _ref;
+  Timer? _syncTimer;
+
+  @override
+  void dispose() {
+    _syncTimer?.cancel();
+    super.dispose();
+  }
 
   Future<void> loadActiveTrip() async {
     try {
       final trip = await _repository.getActiveTrip();
       if (!mounted) return;
+      final wasActive = state.hasActiveTrip;
       state = state.copyWith(trip: trip, clearTrip: trip == null);
+      if (wasActive && !state.hasActiveTrip) {
+        // The server put the driver back online.
+        _ref.invalidate(driverHomeProvider);
+      }
     } catch (e) {
       AppLog.error('DRIVER_TRIP', 'Failed loading active trip', e);
     }
@@ -99,7 +122,12 @@ class DriverTripNotifier extends StateNotifier<DriverTripState> {
       return true;
     } catch (e) {
       if (!mounted) return false;
-      state = state.copyWith(isUpdating: false, error: 'Gagal memperbarui status: $e');
+      state = state.copyWith(
+        isUpdating: false,
+        error: e is ApiException ? e.message : 'Gagal memperbarui status. Coba lagi.',
+      );
+      // The order moved on without this app (e.g. the patient cancelled).
+      if (e is ApiException && e.isConflict) loadActiveTrip();
       return false;
     }
   }

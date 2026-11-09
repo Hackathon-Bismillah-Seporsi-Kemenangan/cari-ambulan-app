@@ -100,6 +100,39 @@ class AmbulanceInfo {
   }
 }
 
+/// Destination hospital, assigned when the patient is on board. Its IGD has
+/// already been alerted.
+class HospitalInfo {
+  const HospitalInfo({
+    required this.name,
+    required this.latitude,
+    required this.longitude,
+    this.address,
+    this.emergencyPhone,
+    this.ambulanceEntrance,
+  });
+
+  final String name;
+  final double latitude;
+  final double longitude;
+  final String? address;
+  final String? emergencyPhone;
+
+  /// Where the ambulance should pull in, e.g. "Gerbang B".
+  final String? ambulanceEntrance;
+
+  factory HospitalInfo.fromJson(Map<String, dynamic> json) {
+    return HospitalInfo(
+      name: json['name'] as String? ?? 'Rumah Sakit',
+      latitude: (json['latitude'] as num?)?.toDouble() ?? 0.0,
+      longitude: (json['longitude'] as num?)?.toDouble() ?? 0.0,
+      address: json['address'] as String?,
+      emergencyPhone: json['emergency_phone'] as String?,
+      ambulanceEntrance: json['ambulance_entrance'] as String?,
+    );
+  }
+}
+
 class EmergencyRequestModel {
   const EmergencyRequestModel({
     required this.id,
@@ -114,6 +147,16 @@ class EmergencyRequestModel {
     this.isExhausted = false,
     this.assignedDriver,
     this.ambulance,
+    this.reporterName,
+    this.reporterPhone,
+    this.bloodType,
+    this.isHighPriority = false,
+    this.hospital,
+    this.hospitalPreparation,
+    this.requestedAt,
+    this.acceptedAt,
+    this.arrivedAtPickupAt,
+    this.pickedUpAt,
   });
 
   final String id;
@@ -129,11 +172,33 @@ class EmergencyRequestModel {
   final AssignedDriver? assignedDriver;
   final AmbulanceInfo? ambulance;
 
+  /// Person who placed the call (the patient or a relative).
+  final String? reporterName;
+  final String? reporterPhone;
+
+  /// From the reporter's Medical ID, when they called for themselves.
+  final String? bloodType;
+  final bool isHighPriority;
+  final HospitalInfo? hospital;
+
+  /// What the IGD is preparing, e.g. "IGD menyiapkan tim jantung."
+  final String? hospitalPreparation;
+  final DateTime? requestedAt;
+  final DateTime? acceptedAt;
+  final DateTime? arrivedAtPickupAt;
+  final DateTime? pickedUpAt;
+
   factory EmergencyRequestModel.fromJson(Map<String, dynamic> json) {
     final pickupMap = json['pickup'] as Map<String, dynamic>? ?? {};
     final searchMap = json['search'] as Map<String, dynamic>? ?? {};
     final driverMap = json['assigned_driver'] as Map<String, dynamic>?;
     final ambMap = json['ambulance'] as Map<String, dynamic>?;
+    final reporterMap = json['reporter'] as Map<String, dynamic>?;
+    final medicalMap = json['medical'] as Map<String, dynamic>?;
+    final hospitalMap = json['hospital'] as Map<String, dynamic>?;
+    final bloodType = medicalMap?['blood_type'] as String?;
+    DateTime? time(Object? value) =>
+        value is String ? DateTime.tryParse(value)?.toLocal() : null;
 
     return EmergencyRequestModel(
       id: json['id'] as String? ?? '',
@@ -148,6 +213,16 @@ class EmergencyRequestModel {
       isExhausted: searchMap['is_exhausted'] as bool? ?? false,
       assignedDriver: driverMap != null ? AssignedDriver.fromJson(driverMap) : null,
       ambulance: ambMap != null ? AmbulanceInfo.fromJson(ambMap) : null,
+      reporterName: reporterMap?['name'] as String?,
+      reporterPhone: reporterMap?['phone'] as String?,
+      bloodType: bloodType == 'unknown' ? null : bloodType,
+      isHighPriority: json['is_high_priority'] as bool? ?? false,
+      hospital: hospitalMap != null ? HospitalInfo.fromJson(hospitalMap) : null,
+      hospitalPreparation: json['hospital_preparation'] as String?,
+      requestedAt: time(json['request_at']),
+      acceptedAt: time(json['accepted_at']),
+      arrivedAtPickupAt: time(json['arrived_at_pickup_at']),
+      pickedUpAt: time(json['picked_up_at']),
     );
   }
 }

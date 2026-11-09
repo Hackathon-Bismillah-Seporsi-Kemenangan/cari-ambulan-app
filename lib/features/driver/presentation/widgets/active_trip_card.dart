@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../emergency/domain/emergency_models.dart';
+import '../pages/trip_navigation_page.dart';
 import '../providers/driver_trip_provider.dart';
 
 class ActiveTripCard extends ConsumerWidget {
@@ -159,6 +160,24 @@ class ActiveTripCard extends ConsumerWidget {
           ],
 
           const SizedBox(height: 16),
+
+          OutlinedButton.icon(
+            onPressed: () => TripNavigationPage.open(context),
+            icon: const Icon(Icons.map_outlined),
+            label: const Text(
+              'BUKA NAVIGASI',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 10),
 
           // Action Button to Advance Stage
           ElevatedButton.icon(

@@ -56,6 +56,14 @@ class DriverHomeNotifier extends AsyncNotifier<DriverHomeState> {
   LocationService get _location => ref.read(locationServiceProvider);
 
   Timer? _beaconTimer;
+  bool _isBeaconing = false;
+
+  /// Enough for dispatch to find an available driver.
+  static const _onlineBeaconInterval = Duration(seconds: 10);
+
+  /// During a trip the patient follows the ambulance on a map, and the
+  /// server picks the hospital from this position, so it goes out more often.
+  static const _tripBeaconInterval = Duration(seconds: 3);
 
   @override
   Future<DriverHomeState> build() async {
@@ -65,8 +73,10 @@ class DriverHomeNotifier extends AsyncNotifier<DriverHomeState> {
 
     final profile = await _repo.fetchProfile();
 
-    if (profile.isOnline) {
-      _startLocationBeacon();
+    if (!profile.isOffline) {
+      _startLocationBeacon(
+        profile.isBusy ? _tripBeaconInterval : _onlineBeaconInterval,
+      );
     }
 
     return DriverHomeState(
@@ -76,12 +86,14 @@ class DriverHomeNotifier extends AsyncNotifier<DriverHomeState> {
     );
   }
 
-  void _startLocationBeacon() {
+  void _startLocationBeacon(Duration interval) {
     _beaconTimer?.cancel();
-    _beaconTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
+    _beaconTimer = Timer.periodic(interval, (_) async {
       final current = state.value;
-      if (current == null || !current.profile.isOnline) return;
+      if (current == null || current.profile.isOffline || _isBeaconing) return;
 
+      // A GPS fix can take longer than the 3 s trip interval.
+      _isBeaconing = true;
       try {
         final coords = await _location.getCoordinates();
         await _repo.sendLocation(coords.latitude, coords.longitude);
@@ -93,6 +105,8 @@ class DriverHomeNotifier extends AsyncNotifier<DriverHomeState> {
         );
       } catch (_) {
         // Beacon failure ignored for next retry
+      } finally {
+        _isBeaconing = false;
       }
     });
   }
@@ -122,7 +136,7 @@ class DriverHomeNotifier extends AsyncNotifier<DriverHomeState> {
       );
 
       if (targetOnline) {
-        _startLocationBeacon();
+        _startLocationBeacon(_onlineBeaconInterval);
       } else {
         _stopLocationBeacon();
       }
