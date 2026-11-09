@@ -64,6 +64,12 @@ class AuthNotifier extends AsyncNotifier<AuthUser?> {
     }
   }
 
+  /// Shows edited account details right away and keeps them for next launch.
+  Future<void> updateUser(AuthUser user) async {
+    state = AsyncData(user);
+    await _repo.saveUser(user);
+  }
+
   Future<void> logout() async {
     await _repo.logout();
     state = const AsyncData(null);

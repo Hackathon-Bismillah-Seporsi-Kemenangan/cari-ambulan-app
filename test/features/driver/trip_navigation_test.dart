@@ -36,7 +36,8 @@ EmergencyRequestModel _trip(EmergencyRequestStatus status) =>
       reporterPhone: '08123',
       bloodType: 'O',
       isHighPriority: true,
-      hospital: status == EmergencyRequestStatus.enRouteToHospital ||
+      hospital:
+          status == EmergencyRequestStatus.enRouteToHospital ||
               status == EmergencyRequestStatus.completed
           ? _hospital
           : null,
@@ -61,6 +62,15 @@ class _TripRepo implements DriverRepository {
   Future<EmergencyRequestModel?> getActiveTrip() async => trip;
 
   @override
+  Future<List<DriverTripHistoryItem>> fetchTripHistory() async => const [];
+
+  @override
+  Future<({String fullName, String? phone})> updateAccount({
+    required String fullName,
+    required String phone,
+  }) async => (fullName: fullName, phone: phone);
+
+  @override
   Future<EmergencyRequestModel> markArrived(String requestId) =>
       _moveTo('arrive', EmergencyRequestStatus.arriveAtPickup);
 
@@ -74,20 +84,19 @@ class _TripRepo implements DriverRepository {
 
   @override
   Future<DriverProfile> fetchProfile() async => const DriverProfile(
-        id: 'drv-1',
-        name: 'Driver',
-        vehiclePlate: 'B 1234 CA',
-        vehicleType: 'Ambulans ALS',
-        availabilityStatus: DriverAvailability.busy,
-      );
+    id: 'drv-1',
+    name: 'Driver',
+    vehiclePlate: 'B 1234 CA',
+    vehicleType: 'Ambulans ALS',
+    availabilityStatus: DriverAvailability.busy,
+  );
 
   @override
   Future<DriverProfile> setAvailability(
     DriverAvailability availability, {
     double? latitude,
     double? longitude,
-  }) async =>
-      throw UnimplementedError();
+  }) async => throw UnimplementedError();
 
   @override
   Future<void> sendLocation(double latitude, double longitude) async {}
@@ -106,24 +115,24 @@ class _TripRepo implements DriverRepository {
 class _StraightRouting implements RoutingRepository {
   @override
   Future<DriveRoute> fetchRoute(LatLng from, LatLng to) async => DriveRoute(
-        points: [from, to],
-        distanceMeters: 1800,
-        duration: const Duration(minutes: 5),
-        steps: [
-          RouteStep(
-            maneuver: Maneuver.depart,
-            streetName: '',
-            distanceMeters: 300,
-            location: from,
-          ),
-          RouteStep(
-            maneuver: Maneuver.right,
-            streetName: 'Jl. Thamrin',
-            distanceMeters: 1500,
-            location: from,
-          ),
-        ],
-      );
+    points: [from, to],
+    distanceMeters: 1800,
+    duration: const Duration(minutes: 5),
+    steps: [
+      RouteStep(
+        maneuver: Maneuver.depart,
+        streetName: '',
+        distanceMeters: 300,
+        location: from,
+      ),
+      RouteStep(
+        maneuver: Maneuver.right,
+        streetName: 'Jl. Thamrin',
+        distanceMeters: 1500,
+        location: from,
+      ),
+    ],
+  );
 }
 
 /// The ambulance marker pulses forever, so wait a fixed time instead of

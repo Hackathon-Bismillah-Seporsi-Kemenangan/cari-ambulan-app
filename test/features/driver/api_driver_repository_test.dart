@@ -9,20 +9,20 @@ import 'package:http/testing.dart';
 
 /// An emergency as the server's `EmergencyRequestResource` sends it.
 Map<String, dynamic> _request(String status) => {
-      'id': 'req-9',
-      'code': 'CA-B3HOZH',
-      'status': status,
-      'emergency_type': 'Jantung',
-      'severity_level': 'high',
-      'is_for_self': true,
-      'patient_notes': 'Nyeri dada',
-      'pickup': {
-        'latitude': -6.2,
-        'longitude': 106.8,
-        'address': 'Jl. Sudirman No. 10',
-      },
-      'reporter': {'name': 'Budi', 'phone': '08123'},
-    };
+  'id': 'req-9',
+  'code': 'CA-B3HOZH',
+  'status': status,
+  'emergency_type': 'Jantung',
+  'severity_level': 'high',
+  'is_for_self': true,
+  'patient_notes': 'Nyeri dada',
+  'pickup': {
+    'latitude': -6.2,
+    'longitude': 106.8,
+    'address': 'Jl. Sudirman No. 10',
+  },
+  'reporter': {'name': 'Budi', 'phone': '08123'},
+};
 
 void main() {
   late List<String> calls;
@@ -43,18 +43,20 @@ void main() {
   setUp(() => calls = []);
 
   test('parses the current offer from the server shape', () async {
-    final repo = repoReturning((_) => {
-          'data': {
-            'id': 42,
-            'status': 'pending',
-            'distance_km': 2,
-            'eta_minutes': 5,
-            'offered_at': '2026-11-09T10:00:00+07:00',
-            'expires_at': '2026-11-09T10:00:30+07:00',
-            'seconds_remaining': 21,
-            'request': _request('searching_driver'),
-          },
-        });
+    final repo = repoReturning(
+      (_) => {
+        'data': {
+          'id': 42,
+          'status': 'pending',
+          'distance_km': 2,
+          'eta_minutes': 5,
+          'offered_at': '2026-11-09T10:00:00+07:00',
+          'expires_at': '2026-11-09T10:00:30+07:00',
+          'seconds_remaining': 21,
+          'request': _request('searching_driver'),
+        },
+      },
+    );
 
     final offer = (await repo.getCurrentOffer())!;
 
@@ -114,5 +116,81 @@ void main() {
     expect(arrived.status, EmergencyRequestStatus.arriveAtPickup);
     expect(toHospital.status, EmergencyRequestStatus.enRouteToHospital);
     expect(done.status, EmergencyRequestStatus.completed);
+  });
+
+  test('reads today\'s completed trips beside the profile', () async {
+    final repo = repoReturning(
+      (_) => {
+        'data': {
+          'id': 'drv-1',
+          'name': 'Budi',
+          'availability_status': 'online',
+        },
+        'today': {'completed_trips': 3},
+      },
+    );
+
+    final profile = await repo.fetchProfile();
+
+    expect(profile.completedTripsToday, 3);
+    expect(profile.isOnline, isTrue);
+  });
+
+  test('parses the trip history', () async {
+    final repo = repoReturning(
+      (_) => {
+        'data': [
+          {
+            'id': 12,
+            'code': 'CA-DONE1',
+            'status': 'completed',
+            'emergency_type': 'Jantung',
+            'pickup_address': 'Jl. Sudirman No. 10',
+            'request_at': '2026-11-09T10:00:00+07:00',
+            'patient_name': 'Budi',
+            'hospital_name': 'RSUD Tarakan',
+            'completed_at': '2026-11-09T10:40:00+07:00',
+          },
+          {
+            'id': 13,
+            'code': 'CA-STOP1',
+            'status': 'cancelled',
+            'pickup_address': 'Jl. Thamrin',
+            'request_at': '2026-11-09T11:00:00+07:00',
+            'cancel_reason': 'Sudah diantar keluarga',
+          },
+        ],
+      },
+    );
+
+    final trips = await repo.fetchTripHistory();
+
+    expect(calls, ['GET /api/v1/driver/trips']);
+    expect(trips.map((t) => t.id), ['12', '13']);
+    expect(trips.first.isCompleted, isTrue);
+    expect(trips.first.hospitalName, 'RSUD Tarakan');
+    expect(trips.last.isCancelled, isTrue);
+    expect(trips.last.emergencyType, 'Darurat');
+    expect(trips.last.cancelReason, 'Sudah diantar keluarga');
+  });
+
+  test('updates the account with PUT me', () async {
+    late Map<String, dynamic> sent;
+    final repo = repoReturning((request) {
+      sent = jsonDecode(request.body) as Map<String, dynamic>;
+      return {
+        'data': {'id': 'u-1', 'full_name': 'Budi S.', 'phone': '0899'},
+      };
+    });
+
+    final updated = await repo.updateAccount(
+      fullName: 'Budi S.',
+      phone: '0899',
+    );
+
+    expect(calls, ['PUT /api/v1/me']);
+    expect(sent, {'full_name': 'Budi S.', 'phone': '0899'});
+    expect(updated.fullName, 'Budi S.');
+    expect(updated.phone, '0899');
   });
 }

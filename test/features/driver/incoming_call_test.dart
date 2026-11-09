@@ -66,26 +66,34 @@ class _CallRepo implements DriverRepository {
 
   @override
   Future<DriverProfile> fetchProfile() async => const DriverProfile(
-        id: 'drv-1',
-        name: 'Driver',
-        vehiclePlate: 'B 1234 CA',
-        vehicleType: 'Ambulans ALS',
-        availabilityStatus: DriverAvailability.online,
-      );
+    id: 'drv-1',
+    name: 'Driver',
+    vehiclePlate: 'B 1234 CA',
+    vehicleType: 'Ambulans ALS',
+    availabilityStatus: DriverAvailability.online,
+  );
 
   @override
   Future<DriverProfile> setAvailability(
     DriverAvailability availability, {
     double? latitude,
     double? longitude,
-  }) async =>
-      throw UnimplementedError();
+  }) async => throw UnimplementedError();
 
   @override
   Future<void> sendLocation(double latitude, double longitude) async {}
 
   @override
   Future<EmergencyRequestModel?> getActiveTrip() async => null;
+
+  @override
+  Future<List<DriverTripHistoryItem>> fetchTripHistory() async => const [];
+
+  @override
+  Future<({String fullName, String? phone})> updateAccount({
+    required String fullName,
+    required String phone,
+  }) async => (fullName: fullName, phone: phone);
 
   @override
   Future<EmergencyRequestModel> markArrived(String requestId) async =>
@@ -108,7 +116,10 @@ Future<void> _settle(WidgetTester tester) async {
   }
 }
 
-Future<ProviderContainer> _pumpShell(WidgetTester tester, _CallRepo repo) async {
+Future<ProviderContainer> _pumpShell(
+  WidgetTester tester,
+  _CallRepo repo,
+) async {
   // Wide enough for the test font, whose glyphs are all full squares.
   tester.view.physicalSize = const Size(1800, 3000);
   tester.view.devicePixelRatio = 2.5;
@@ -139,8 +150,9 @@ void main() {
     expect(offer.offerWindow, const Duration(seconds: 30));
   });
 
-  testWidgets('an offer rings full-screen and accepting starts the trip',
-      (tester) async {
+  testWidgets('an offer rings full-screen and accepting starts the trip', (
+    tester,
+  ) async {
     final repo = _CallRepo();
     final container = await _pumpShell(tester, repo);
 

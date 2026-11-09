@@ -42,7 +42,8 @@ class _MockDriverRepository implements DriverRepository {
   Future<DispatchOfferModel?> getCurrentOffer() async => null;
 
   @override
-  Future<EmergencyRequestModel> acceptRequest(String requestId) async => throw UnimplementedError();
+  Future<EmergencyRequestModel> acceptRequest(String requestId) async =>
+      throw UnimplementedError();
 
   @override
   Future<void> declineRequest(String requestId) async {}
@@ -51,13 +52,25 @@ class _MockDriverRepository implements DriverRepository {
   Future<EmergencyRequestModel?> getActiveTrip() async => null;
 
   @override
-  Future<EmergencyRequestModel> markArrived(String requestId) async => throw UnimplementedError();
+  Future<List<DriverTripHistoryItem>> fetchTripHistory() async => const [];
 
   @override
-  Future<EmergencyRequestModel> startToHospital(String requestId) async => throw UnimplementedError();
+  Future<({String fullName, String? phone})> updateAccount({
+    required String fullName,
+    required String phone,
+  }) async => (fullName: fullName, phone: phone);
 
   @override
-  Future<EmergencyRequestModel> completeTrip(String requestId) async => throw UnimplementedError();
+  Future<EmergencyRequestModel> markArrived(String requestId) async =>
+      throw UnimplementedError();
+
+  @override
+  Future<EmergencyRequestModel> startToHospital(String requestId) async =>
+      throw UnimplementedError();
+
+  @override
+  Future<EmergencyRequestModel> completeTrip(String requestId) async =>
+      throw UnimplementedError();
 }
 
 void main() {
@@ -73,10 +86,7 @@ void main() {
           'plate_number': 'B 1199 SGM',
           'vehicle_type': 'Ambulans ALS',
         },
-        'hospital': {
-          'id': 'hosp-1',
-          'name': 'RS Medika',
-        },
+        'hospital': {'id': 'hosp-1', 'name': 'RS Medika'},
       });
 
       expect(profile.id, 'drv-1');
@@ -160,9 +170,7 @@ void main() {
 
       final mockRepo = _MockDriverRepository(initialProfile);
       final container = ProviderContainer(
-        overrides: [
-          driverRepositoryProvider.overrideWithValue(mockRepo),
-        ],
+        overrides: [driverRepositoryProvider.overrideWithValue(mockRepo)],
       );
 
       addTearDown(container.dispose);
@@ -178,4 +186,3 @@ void main() {
     });
   });
 }
-

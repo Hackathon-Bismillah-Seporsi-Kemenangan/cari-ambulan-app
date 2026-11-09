@@ -34,4 +34,13 @@ abstract class DriverRepository {
 
   /// Patient handed over to the IGD; the driver is back online.
   Future<EmergencyRequestModel> completeTrip(String requestId);
+
+  /// Completed and cancelled trips, newest first (latest 50).
+  Future<List<DriverTripHistoryItem>> fetchTripHistory();
+
+  /// Updates the account's name and phone (`PUT me`).
+  Future<({String fullName, String? phone})> updateAccount({
+    required String fullName,
+    required String phone,
+  });
 }

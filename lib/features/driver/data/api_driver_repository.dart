@@ -13,7 +13,10 @@ class ApiDriverRepository implements DriverRepository {
   Future<DriverProfile> fetchProfile() async {
     final json = await _client.get('driver/profile');
     final data = json!['data'] as Map<String, dynamic>;
-    return DriverProfile.fromJson(data);
+    final today = json['today'] as Map<String, dynamic>?;
+    return DriverProfile.fromJson(data).copyWith(
+      completedTripsToday: (today?['completed_trips'] as num?)?.toInt(),
+    );
   }
 
   @override
@@ -93,5 +96,30 @@ class ApiDriverRepository implements DriverRepository {
       throw ApiException(failure);
     }
     return EmergencyRequestModel.fromJson(data);
+  }
+
+  @override
+  Future<List<DriverTripHistoryItem>> fetchTripHistory() async {
+    final json = await _client.get('driver/trips');
+    return [
+      for (final item in json?['data'] as List? ?? const [])
+        DriverTripHistoryItem.fromJson(item as Map<String, dynamic>),
+    ];
+  }
+
+  @override
+  Future<({String fullName, String? phone})> updateAccount({
+    required String fullName,
+    required String phone,
+  }) async {
+    final json = await _client.put('me', {
+      'full_name': fullName,
+      'phone': phone,
+    });
+    final data = json!['data'] as Map<String, dynamic>;
+    return (
+      fullName: (data['full_name'] ?? data['name'] ?? fullName) as String,
+      phone: data['phone'] as String?,
+    );
   }
 }

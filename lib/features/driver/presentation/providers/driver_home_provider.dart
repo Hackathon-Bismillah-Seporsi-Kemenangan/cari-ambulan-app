@@ -143,7 +143,10 @@ class DriverHomeNotifier extends AsyncNotifier<DriverHomeState> {
 
       state = AsyncData(
         current.copyWith(
-          profile: updated,
+          // The availability response has no trip count; keep the last one.
+          profile: updated.copyWith(
+            completedTripsToday: current.profile.completedTripsToday,
+          ),
           isUpdating: false,
           error: null,
           lastBeaconLatitude: coords?.latitude,
