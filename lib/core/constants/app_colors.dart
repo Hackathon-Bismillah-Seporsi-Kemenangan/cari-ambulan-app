@@ -28,5 +28,9 @@ class AppColors {
   static const Color warning = Color(0xFFF57F17);
   static const Color error = Color(0xFFC62828);
   static const Color info = Color(0xFF0277BD);
+
+  // Driver availability
+  static const Color offline = Color(0xFF9CA3AF);
+  static const Color offlineLight = Color(0xFFE5E7EB);
 }
 
