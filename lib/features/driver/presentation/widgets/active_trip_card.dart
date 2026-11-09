@@ -23,10 +23,6 @@ class ActiveTripCard extends ConsumerWidget {
 
     switch (trip.status) {
       case EmergencyRequestStatus.driverAssigned:
-        actionButtonLabel = 'MULAI MELUNCUR KE PASIEN';
-        actionButtonIcon = Icons.navigation;
-        actionButtonColor = AppColors.primary;
-        break;
       case EmergencyRequestStatus.enRouteToPickup:
         actionButtonLabel = 'TIBA DI LOKASI JEMPUT';
         actionButtonIcon = Icons.place;

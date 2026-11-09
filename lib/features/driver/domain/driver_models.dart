@@ -42,8 +42,8 @@ class DriverProfile {
       vehiclePlate: vehicle?['plate_number'] as String? ?? '–',
       vehicleType: vehicle?['vehicle_type'] as String? ?? 'Ambulans ALS',
       hospitalName: hospital?['name'] as String?,
-      currentLatitude: location?['latitude'] as double?,
-      currentLongitude: location?['longitude'] as double?,
+      currentLatitude: (location?['latitude'] as num?)?.toDouble(),
+      currentLongitude: (location?['longitude'] as num?)?.toDouble(),
       availabilityStatus: DriverAvailability.parse(json['availability_status'] as String?),
     );
   }

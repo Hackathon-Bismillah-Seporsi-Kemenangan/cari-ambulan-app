@@ -33,27 +33,29 @@ class DispatchOfferModel {
   final String? patientPhone;
   final DateTime? offeredAt;
 
+  /// Parses `GET /driver/offers/current`: offer fields at the top, the
+  /// emergency itself nested under `request`.
   factory DispatchOfferModel.fromJson(Map<String, dynamic> json) {
-    final pickup = json['pickup'] as Map<String, dynamic>? ?? {};
-    final patient = json['patient'] as Map<String, dynamic>? ?? {};
+    final request = json['request'] as Map<String, dynamic>? ?? {};
+    final pickup = request['pickup'] as Map<String, dynamic>? ?? {};
+    final reporter = request['reporter'] as Map<String, dynamic>? ?? {};
 
     return DispatchOfferModel(
       id: (json['id'] as num?)?.toInt() ?? 0,
-      emergencyRequestId: json['emergency_request_id'] as String? ?? '',
-      requestCode: json['request_code'] as String? ?? '',
-      status: json['status'] as String? ?? 'offered',
+      emergencyRequestId: '${request['id'] ?? ''}',
+      requestCode: request['code'] as String? ?? '',
+      status: json['status'] as String? ?? 'pending',
       distanceKm: (json['distance_km'] as num?)?.toDouble() ?? 0.0,
       secondsRemaining: (json['seconds_remaining'] as num?)?.toInt() ?? 30,
-      emergencyType: json['emergency_type'] as String?,
-      severityLevel: json['severity_level'] as String?,
-      patientNotes: json['patient_notes'] as String?,
+      emergencyType: request['emergency_type'] as String?,
+      severityLevel: request['severity_level'] as String?,
+      patientNotes: request['patient_notes'] as String?,
       pickupAddress: pickup['address'] as String? ?? 'Lokasi penjemputan',
       pickupLatitude: (pickup['latitude'] as num?)?.toDouble() ?? 0.0,
       pickupLongitude: (pickup['longitude'] as num?)?.toDouble() ?? 0.0,
-      patientName: patient['name'] as String? ?? 'Pasien Darurat',
-      patientPhone: patient['phone'] as String?,
+      patientName: reporter['name'] as String? ?? 'Pasien Darurat',
+      patientPhone: reporter['phone'] as String?,
       offeredAt: json['offered_at'] != null ? DateTime.tryParse(json['offered_at'] as String) : null,
     );
   }
 }
-

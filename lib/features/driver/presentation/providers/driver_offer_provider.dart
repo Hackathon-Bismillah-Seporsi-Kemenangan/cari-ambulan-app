@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/logging/app_log.dart';
+import '../../../emergency/domain/emergency_models.dart';
 import '../../data/driver_repository.dart';
 import '../../domain/dispatch_offer_model.dart';
 import 'driver_home_provider.dart';
@@ -112,21 +113,23 @@ class DriverOfferNotifier extends StateNotifier<DriverOfferState> {
     });
   }
 
-  Future<bool> accept() async {
+  /// Accepts the offer; returns the trip that starts, or null on failure.
+  Future<EmergencyRequestModel?> accept() async {
     final offer = state.offer;
-    if (offer == null) return false;
+    if (offer == null) return null;
 
     state = state.copyWith(isResponding: true, error: null);
     try {
-      await _repository.acceptOffer(offer.id);
+      final trip = await _repository.acceptRequest(offer.emergencyRequestId);
       _stopCountdown();
-      if (!mounted) return true;
-      state = state.copyWith(clearOffer: true, isResponding: false);
-      return true;
+      if (mounted) {
+        state = state.copyWith(clearOffer: true, isResponding: false);
+      }
+      return trip;
     } catch (e) {
-      if (!mounted) return false;
+      if (!mounted) return null;
       state = state.copyWith(isResponding: false, error: 'Gagal menerima: $e');
-      return false;
+      return null;
     }
   }
 
@@ -136,7 +139,7 @@ class DriverOfferNotifier extends StateNotifier<DriverOfferState> {
 
     state = state.copyWith(isResponding: true, error: null);
     try {
-      await _repository.declineOffer(offer.id);
+      await _repository.declineRequest(offer.emergencyRequestId);
     } catch (e) {
       AppLog.error('DRIVER_OFFER', 'Failed declining offer', e);
     } finally {

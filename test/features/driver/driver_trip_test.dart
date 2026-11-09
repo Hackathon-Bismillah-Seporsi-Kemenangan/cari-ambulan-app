@@ -27,20 +27,31 @@ class _MockTripDriverRepo implements DriverRepository {
   Future<DispatchOfferModel?> getCurrentOffer() async => null;
 
   @override
-  Future<EmergencyRequestModel> acceptOffer(int offerId) async => throw UnimplementedError();
+  Future<EmergencyRequestModel> acceptRequest(String requestId) async => throw UnimplementedError();
 
   @override
-  Future<void> declineOffer(int offerId) async {}
+  Future<void> declineRequest(String requestId) async {}
 
   @override
   Future<EmergencyRequestModel?> getActiveTrip() async => _trip;
 
   @override
-  Future<EmergencyRequestModel> updateTripStatus(String status) async {
+  Future<EmergencyRequestModel> markArrived(String requestId) async =>
+      _moveTo(EmergencyRequestStatus.arriveAtPickup);
+
+  @override
+  Future<EmergencyRequestModel> startToHospital(String requestId) async =>
+      _moveTo(EmergencyRequestStatus.enRouteToHospital);
+
+  @override
+  Future<EmergencyRequestModel> completeTrip(String requestId) async =>
+      _moveTo(EmergencyRequestStatus.completed);
+
+  EmergencyRequestModel _moveTo(EmergencyRequestStatus status) {
     _trip = EmergencyRequestModel(
       id: _trip?.id ?? 'req-1',
       requestCode: _trip?.requestCode ?? 'CA-TRIP1',
-      status: EmergencyRequestStatus.fromString(status),
+      status: status,
       pickup: _trip?.pickup ?? const EmergencyLocation(latitude: -6.2, longitude: 106.8, address: 'Test Lokasi'),
     );
     return _trip!;
@@ -51,7 +62,7 @@ void main() {
   const dummyTrip = EmergencyRequestModel(
     id: 'trip-1',
     requestCode: 'CA-RUN1',
-    status: EmergencyRequestStatus.driverAssigned,
+    status: EmergencyRequestStatus.enRouteToPickup,
     pickup: EmergencyLocation(latitude: -6.2088, longitude: 106.8222, address: 'Jl. Sudirman No. 10'),
     emergencyType: 'Jantung',
     patientNotes: 'Nyeri dada',
@@ -78,13 +89,13 @@ void main() {
 
       expect(find.text('TUGAS AKTIF'), findsOneWidget);
       expect(find.text('Jl. Sudirman No. 10'), findsOneWidget);
-      expect(find.text('MULAI MELUNCUR KE PASIEN'), findsOneWidget);
+      expect(find.text('TIBA DI LOKASI JEMPUT'), findsOneWidget);
 
-      // Tap to advance to en_route_to_pickup
-      await tester.tap(find.text('MULAI MELUNCUR KE PASIEN'));
+      // Tap to mark arrival at the pickup
+      await tester.tap(find.text('TIBA DI LOKASI JEMPUT'));
       await tester.pumpAndSettle();
 
-      expect(find.text('TIBA DI LOKASI JEMPUT'), findsOneWidget);
+      expect(find.text('BAWA PASIEN KE RUMAH SAKIT'), findsOneWidget);
     });
   });
 }

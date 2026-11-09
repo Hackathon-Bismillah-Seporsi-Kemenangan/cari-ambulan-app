@@ -42,16 +42,22 @@ class _MockDriverRepository implements DriverRepository {
   Future<DispatchOfferModel?> getCurrentOffer() async => null;
 
   @override
-  Future<EmergencyRequestModel> acceptOffer(int offerId) async => throw UnimplementedError();
+  Future<EmergencyRequestModel> acceptRequest(String requestId) async => throw UnimplementedError();
 
   @override
-  Future<void> declineOffer(int offerId) async {}
+  Future<void> declineRequest(String requestId) async {}
 
   @override
   Future<EmergencyRequestModel?> getActiveTrip() async => null;
 
   @override
-  Future<EmergencyRequestModel> updateTripStatus(String status) async => throw UnimplementedError();
+  Future<EmergencyRequestModel> markArrived(String requestId) async => throw UnimplementedError();
+
+  @override
+  Future<EmergencyRequestModel> startToHospital(String requestId) async => throw UnimplementedError();
+
+  @override
+  Future<EmergencyRequestModel> completeTrip(String requestId) async => throw UnimplementedError();
 }
 
 void main() {

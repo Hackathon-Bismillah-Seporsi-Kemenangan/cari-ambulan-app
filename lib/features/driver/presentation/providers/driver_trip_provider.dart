@@ -57,24 +57,27 @@ class DriverTripNotifier extends StateNotifier<DriverTripState> {
     }
   }
 
+  /// Show the trip the driver just accepted.
+  void setTrip(EmergencyRequestModel trip) {
+    state = state.copyWith(trip: trip, error: null);
+  }
+
   /// Advance to the next logical stage of the trip.
   Future<bool> advanceStage() async {
     final trip = state.trip;
     if (trip == null) return false;
 
-    String? targetStatus;
+    final Future<EmergencyRequestModel> Function(String requestId) step;
     switch (trip.status) {
       case EmergencyRequestStatus.driverAssigned:
-        targetStatus = 'en_route_to_pickup';
-        break;
       case EmergencyRequestStatus.enRouteToPickup:
-        targetStatus = 'arrive_at_pickup';
+        step = _repository.markArrived;
         break;
       case EmergencyRequestStatus.arriveAtPickup:
-        targetStatus = 'en_route_to_hospital';
+        step = _repository.startToHospital;
         break;
       case EmergencyRequestStatus.enRouteToHospital:
-        targetStatus = 'completed';
+        step = _repository.completeTrip;
         break;
       default:
         return false;
@@ -83,7 +86,7 @@ class DriverTripNotifier extends StateNotifier<DriverTripState> {
     state = state.copyWith(isUpdating: true, error: null);
 
     try {
-      final updated = await _repository.updateTripStatus(targetStatus);
+      final updated = await step(trip.id);
       if (!mounted) return true;
 
       if (updated.status == EmergencyRequestStatus.completed) {

@@ -137,7 +137,7 @@ class EmergencyRequestModel {
 
     return EmergencyRequestModel(
       id: json['id'] as String? ?? '',
-      requestCode: json['request_code'] as String? ?? '',
+      requestCode: (json['code'] ?? json['request_code']) as String? ?? '',
       status: EmergencyRequestStatus.fromString(json['status'] as String?),
       pickup: EmergencyLocation.fromJson(pickupMap),
       isForSelf: json['is_for_self'] as bool? ?? true,

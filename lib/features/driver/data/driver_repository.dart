@@ -16,16 +16,22 @@ abstract class DriverRepository {
   /// Fetch incoming emergency dispatch offer for this driver.
   Future<DispatchOfferModel?> getCurrentOffer();
 
-  /// Accept an emergency offer.
-  Future<EmergencyRequestModel> acceptOffer(int offerId);
+  /// Accept the offered emergency. The trip starts en route to the pickup.
+  Future<EmergencyRequestModel> acceptRequest(String requestId);
 
-  /// Decline an emergency offer.
-  Future<void> declineOffer(int offerId);
+  /// Decline the offered emergency so dispatch tries the next driver.
+  Future<void> declineRequest(String requestId);
 
-  /// Fetch active emergency trip currently being served by this driver.
+  /// Fetch the trip this driver is serving (or one the patient cancelled
+  /// recently), so it can be resumed after a restart.
   Future<EmergencyRequestModel?> getActiveTrip();
 
-  /// Progress the status of the current emergency trip.
-  Future<EmergencyRequestModel> updateTripStatus(String status);
-}
+  /// The ambulance reached the pickup.
+  Future<EmergencyRequestModel> markArrived(String requestId);
 
+  /// Patient on board; the server assigns the nearest hospital.
+  Future<EmergencyRequestModel> startToHospital(String requestId);
+
+  /// Patient handed over to the IGD; the driver is back online.
+  Future<EmergencyRequestModel> completeTrip(String requestId);
+}

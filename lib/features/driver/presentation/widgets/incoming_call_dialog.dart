@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../providers/driver_home_provider.dart';
 import '../providers/driver_offer_provider.dart';
+import '../providers/driver_trip_provider.dart';
 
 class IncomingCallDialog extends ConsumerWidget {
   const IncomingCallDialog({super.key});
@@ -216,11 +217,12 @@ class IncomingCallDialog extends ConsumerWidget {
                             onPressed: offerState.isResponding
                                 ? null
                                 : () async {
-                                    final success = await ref
+                                    final trip = await ref
                                         .read(driverOfferProvider.notifier)
                                         .accept();
-                                    if (success) {
-                                      // Invalidate driver home to refresh state to busy / active trip
+                                    if (trip != null) {
+                                      ref.read(driverTripProvider.notifier).setTrip(trip);
+                                      // Refresh the profile, now busy
                                       ref.invalidate(driverHomeProvider);
                                     }
                                   },

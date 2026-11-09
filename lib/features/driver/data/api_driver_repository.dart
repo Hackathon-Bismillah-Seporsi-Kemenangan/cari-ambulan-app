@@ -54,36 +54,43 @@ class ApiDriverRepository implements DriverRepository {
   }
 
   @override
-  Future<EmergencyRequestModel> acceptOffer(int offerId) async {
-    final response = await _client.post('driver/offers/$offerId/accept');
-    final data = response?['data'] as Map<String, dynamic>?;
-    if (data == null) {
-      throw const ApiException('Gagal menerima panggilan');
-    }
-    return EmergencyRequestModel.fromJson(data);
-  }
+  Future<EmergencyRequestModel> acceptRequest(String requestId) =>
+      _tripAction(requestId, 'accept', 'Gagal menerima panggilan');
 
   @override
-  Future<void> declineOffer(int offerId) async {
-    await _client.post('driver/offers/$offerId/decline');
+  Future<void> declineRequest(String requestId) async {
+    await _client.post('driver/requests/$requestId/decline');
   }
 
   @override
   Future<EmergencyRequestModel?> getActiveTrip() async {
-    final response = await _client.get('driver/trip/current');
+    final response = await _client.get('driver/trip');
     final data = response?['data'] as Map<String, dynamic>?;
     if (data == null) return null;
     return EmergencyRequestModel.fromJson(data);
   }
 
   @override
-  Future<EmergencyRequestModel> updateTripStatus(String status) async {
-    final response = await _client.put('driver/trip/status', {
-      'status': status,
-    });
+  Future<EmergencyRequestModel> markArrived(String requestId) =>
+      _tripAction(requestId, 'arrive', 'Gagal memperbarui status perjalanan');
+
+  @override
+  Future<EmergencyRequestModel> startToHospital(String requestId) =>
+      _tripAction(requestId, 'start-to-hospital', 'Gagal memperbarui status perjalanan');
+
+  @override
+  Future<EmergencyRequestModel> completeTrip(String requestId) =>
+      _tripAction(requestId, 'complete', 'Gagal menyelesaikan perjalanan');
+
+  Future<EmergencyRequestModel> _tripAction(
+    String requestId,
+    String action,
+    String failure,
+  ) async {
+    final response = await _client.post('driver/requests/$requestId/$action');
     final data = response?['data'] as Map<String, dynamic>?;
     if (data == null) {
-      throw const ApiException('Gagal memperbarui status perjalanan');
+      throw ApiException(failure);
     }
     return EmergencyRequestModel.fromJson(data);
   }
