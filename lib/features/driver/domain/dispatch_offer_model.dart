@@ -14,7 +14,11 @@ class DispatchOfferModel {
     required this.pickupLongitude,
     required this.patientName,
     this.patientPhone,
+    this.bloodType,
+    this.etaMinutes,
+    this.nearestHospitalName,
     this.offeredAt,
+    this.expiresAt,
   });
 
   final int id;
@@ -31,7 +35,21 @@ class DispatchOfferModel {
   final double pickupLongitude;
   final String patientName;
   final String? patientPhone;
+  final String? bloodType;
+  final int? etaMinutes;
+  final String? nearestHospitalName;
   final DateTime? offeredAt;
+  final DateTime? expiresAt;
+
+  /// Full time the driver has to answer, 30 s on the server.
+  Duration get offerWindow {
+    final offered = offeredAt;
+    final expires = expiresAt;
+    if (offered == null || expires == null || !expires.isAfter(offered)) {
+      return const Duration(seconds: 30);
+    }
+    return expires.difference(offered);
+  }
 
   /// Parses `GET /driver/offers/current`: offer fields at the top, the
   /// emergency itself nested under `request`.
@@ -39,6 +57,9 @@ class DispatchOfferModel {
     final request = json['request'] as Map<String, dynamic>? ?? {};
     final pickup = request['pickup'] as Map<String, dynamic>? ?? {};
     final reporter = request['reporter'] as Map<String, dynamic>? ?? {};
+    final medical = request['medical'] as Map<String, dynamic>? ?? {};
+    final hospital = json['nearest_hospital'] as Map<String, dynamic>?;
+    final bloodType = medical['blood_type'] as String?;
 
     return DispatchOfferModel(
       id: (json['id'] as num?)?.toInt() ?? 0,
@@ -55,7 +76,11 @@ class DispatchOfferModel {
       pickupLongitude: (pickup['longitude'] as num?)?.toDouble() ?? 0.0,
       patientName: reporter['name'] as String? ?? 'Pasien Darurat',
       patientPhone: reporter['phone'] as String?,
+      bloodType: bloodType == 'unknown' ? null : bloodType,
+      etaMinutes: (json['eta_minutes'] as num?)?.toInt(),
+      nearestHospitalName: hospital?['name'] as String?,
       offeredAt: json['offered_at'] != null ? DateTime.tryParse(json['offered_at'] as String) : null,
+      expiresAt: json['expires_at'] != null ? DateTime.tryParse(json['expires_at'] as String) : null,
     );
   }
 }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/logging/app_log.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../emergency/domain/emergency_models.dart';
 import '../../data/driver_repository.dart';
 import '../../domain/dispatch_offer_model.dart';
@@ -128,7 +129,12 @@ class DriverOfferNotifier extends StateNotifier<DriverOfferState> {
       return trip;
     } catch (e) {
       if (!mounted) return null;
-      state = state.copyWith(isResponding: false, error: 'Gagal menerima: $e');
+      state = state.copyWith(
+        isResponding: false,
+        error: e is ApiException
+            ? e.message
+            : 'Order sudah tidak tersedia atau koneksi bermasalah.',
+      );
       return null;
     }
   }
