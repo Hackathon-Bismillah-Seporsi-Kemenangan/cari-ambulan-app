@@ -4,8 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../auth/domain/auth_models.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../emergency/domain/emergency_models.dart';
 import '../../../emergency/presentation/providers/emergency_provider.dart';
-import '../../../emergency/presentation/widgets/assigned_driver_card.dart';
+import '../../../emergency/presentation/widgets/ambulance_tracking_view.dart';
 import '../../../emergency/presentation/widgets/searching_ambulance_view.dart';
 import '../../../emergency/presentation/widgets/sos_button.dart';
 
@@ -16,12 +17,30 @@ class UserShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Tell the user how a request ended when it wasn't their own cancel.
+    ref.listen<EmergencyState>(emergencyProvider, (_, next) {
+      if (next case EmergencyInitial(:final closed?)) {
+        final hospital = closed.hospital?.name;
+        final message = closed.status != EmergencyRequestStatus.completed
+            ? 'Pesanan ambulans dibatalkan.'
+            : hospital == null
+                ? 'Pasien telah diserahkan ke IGD. Semoga lekas sembuh!'
+                : 'Pasien telah diserahkan ke IGD $hospital. '
+                    'Semoga lekas sembuh!';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
+    });
+
     final emergencyState = ref.watch(emergencyProvider);
 
-    // The search takes the whole screen: map, radius and drivers called.
-    if (emergencyState case EmergencyActive(:final request)
-        when request.status.isSearching) {
-      return SearchingAmbulanceView(request: request);
+    // An open request takes the whole screen: the search, then the
+    // ambulance live on the map.
+    if (emergencyState case EmergencyActive(:final request)) {
+      return request.status.isSearching
+          ? SearchingAmbulanceView(request: request)
+          : AmbulanceTrackingView(request: request);
     }
 
     return Scaffold(
@@ -54,8 +73,8 @@ class UserShell extends ConsumerWidget {
                 ],
               ),
             ),
-          EmergencyActive(:final request) =>
-            AssignedDriverCard(request: request),
+          // Shown full screen above.
+          EmergencyActive() => const SizedBox.shrink(),
           EmergencyError(:final message) => Center(
               child: Padding(
                 padding: const EdgeInsets.all(24.0),

@@ -21,7 +21,11 @@ sealed class EmergencyState {
 }
 
 class EmergencyInitial extends EmergencyState {
-  const EmergencyInitial();
+  const EmergencyInitial({this.closed});
+
+  /// The request that just ended without the user cancelling it here:
+  /// handed over at the IGD, or cancelled elsewhere. Null otherwise.
+  final EmergencyRequestModel? closed;
 }
 
 class EmergencyLoading extends EmergencyState {
@@ -91,7 +95,7 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
     if (!mounted) return;
     if (request.status.isClosed) {
       _stopPolling();
-      state = const EmergencyInitial();
+      state = EmergencyInitial(closed: request);
     } else {
       state = EmergencyActive(request);
     }

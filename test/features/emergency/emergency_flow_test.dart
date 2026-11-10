@@ -4,13 +4,16 @@ import 'package:cari_ambulan_app/features/emergency/data/api_emergency_repositor
 import 'package:cari_ambulan_app/features/emergency/data/emergency_repository.dart';
 import 'package:cari_ambulan_app/features/emergency/domain/emergency_models.dart';
 import 'package:cari_ambulan_app/features/emergency/presentation/providers/emergency_provider.dart';
-import 'package:cari_ambulan_app/features/emergency/presentation/widgets/assigned_driver_card.dart';
+import 'package:cari_ambulan_app/features/driver/data/routing_repository.dart';
+import 'package:cari_ambulan_app/features/driver/domain/route_models.dart';
+import 'package:cari_ambulan_app/features/emergency/presentation/widgets/ambulance_tracking_view.dart';
 import 'package:cari_ambulan_app/features/emergency/presentation/widgets/searching_ambulance_view.dart';
 import 'package:cari_ambulan_app/features/emergency/presentation/widgets/sos_button.dart';
 import 'package:cari_ambulan_app/features/user/presentation/pages/user_shell.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:latlong2/latlong.dart';
 
 class _FakeEmergencyRepository implements EmergencyRepository {
   EmergencyRequestModel? _current;
@@ -73,6 +76,7 @@ class _FakeEmergencyRepository implements EmergencyRepository {
 
   @override
   Future<EmergencyRequestModel> cancelRequest(String id, {String? reason}) async {
+    calls.add('cancel $id $reason');
     _current = EmergencyRequestModel(
       id: id,
       requestCode: 'CA-TEST1',
@@ -82,6 +86,48 @@ class _FakeEmergencyRepository implements EmergencyRepository {
     return _current!;
   }
 }
+
+/// A 5-minute, 1.8 km road route, without calling OSRM.
+class _FakeRouting implements RoutingRepository {
+  @override
+  Future<DriveRoute> fetchRoute(LatLng from, LatLng to) async => DriveRoute(
+        points: [from, to],
+        distanceMeters: 1800,
+        duration: const Duration(minutes: 5),
+        steps: const [],
+      );
+}
+
+const _hospital = HospitalInfo(
+  name: 'RSUD Tarakan',
+  latitude: -6.171,
+  longitude: 106.81,
+  ambulanceEntrance: 'Gerbang B',
+);
+
+EmergencyRequestModel _trip(EmergencyRequestStatus status) =>
+    EmergencyRequestModel(
+      id: 'req-2',
+      requestCode: 'CA-TRACK',
+      status: status,
+      pickup: const EmergencyLocation(
+        latitude: -6.2,
+        longitude: 106.8,
+        address: 'Sudirman Tower',
+      ),
+      assignedDriver: const AssignedDriver(name: 'Budi Santoso', phone: '0812'),
+      ambulance: const AmbulanceInfo(
+        plateNumber: 'B 1199 SGM',
+        vehicleType: 'Ambulans ALS',
+        latitude: -6.19,
+        longitude: 106.81,
+        locationAgeSeconds: 2,
+      ),
+      hospital: status == EmergencyRequestStatus.enRouteToPickup
+          ? null
+          : _hospital,
+      hospitalPreparation: 'IGD menyiapkan tim jantung.',
+    );
 
 const _dummyUser = AuthUser(
   id: 'usr-1',
@@ -108,7 +154,10 @@ Future<void> _pumpShell(
 
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [emergencyRepositoryProvider.overrideWithValue(repo)],
+      overrides: [
+        emergencyRepositoryProvider.overrideWithValue(repo),
+        routingRepositoryProvider.overrideWithValue(_FakeRouting()),
+      ],
       child: const MaterialApp(home: UserShell(user: _dummyUser)),
     ),
   );
@@ -137,18 +186,19 @@ void main() {
           'longitude': 106.8222,
           'address': 'Grand Indonesia',
         },
-        'search': {'radius_km': 5, 'is_exhausted': false},
-        'assigned_driver': {
-          'id': 'drv-1',
+        'driver': {
           'name': 'Budi Santoso',
           'phone': '081200001199',
-          'license_number': 'SIM-123',
+          'photo_url': null,
         },
         'ambulance': {
-          'id': 'amb-1',
           'plate_number': 'B 1199 SGM',
-          'ambulance_type': 'ALS',
+          'vehicle_type': 'Ambulans ALS',
+          'latitude': -6.19,
+          'longitude': 106.81,
+          'location_age_seconds': 45,
         },
+        'eta': {'minutes': 4, 'distance_km': 1.2},
       };
 
       final model = EmergencyRequestModel.fromJson(json);
@@ -158,6 +208,12 @@ void main() {
       expect(model.status.isActiveTrip, isTrue);
       expect(model.assignedDriver?.name, 'Budi Santoso');
       expect(model.ambulance?.plateNumber, 'B 1199 SGM');
+      expect(model.ambulance?.vehicleLabel, 'ALS · Gawat Darurat');
+      expect(model.ambulance?.location, const LatLng(-6.19, 106.81));
+      // 45 s without a position: the driver went quiet.
+      expect(model.ambulance?.isSilent, isTrue);
+      expect(model.etaMinutes, 4);
+      expect(model.etaDistanceKm, 1.2);
     });
 
     test('EmergencyRequestModel reads the search progress', () {
@@ -279,46 +335,64 @@ void main() {
       expect(find.text('Mencari ambulans terdekat...'), findsOneWidget);
     });
 
-    testWidgets('Renders AssignedDriverCard when driver is assigned', (tester) async {
-      final fakeRepo = _FakeEmergencyRepository();
-      fakeRepo._current = const EmergencyRequestModel(
-        id: 'req-2',
-        requestCode: 'CA-ASSIGNED',
-        status: EmergencyRequestStatus.driverAssigned,
-        pickup: EmergencyLocation(latitude: -6.2, longitude: 106.8, address: 'Sudirman Tower'),
-        assignedDriver: AssignedDriver(
-          id: 'd-1',
-          name: 'Budi Santoso',
-          phone: '081200001199',
-          licenseNumber: 'SIM-31750001',
-        ),
-        ambulance: AmbulanceInfo(
-          id: 'a-1',
-          plateNumber: 'B 1199 SGM',
-          vehicleModel: 'Toyota HiAce ALS',
-        ),
-      );
+    testWidgets('Tracking shows the ambulance on its way', (tester) async {
+      final fakeRepo = _FakeEmergencyRepository()
+        .._current = _trip(EmergencyRequestStatus.enRouteToPickup);
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            emergencyRepositoryProvider.overrideWithValue(fakeRepo),
-          ],
-          child: const MaterialApp(
-            home: UserShell(user: dummyUser),
-          ),
-        ),
-      );
+      await _pumpShell(tester, fakeRepo);
 
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-
-      expect(find.byType(AssignedDriverCard), findsOneWidget);
-      expect(find.text('Ambulans Ditugaskan'), findsAtLeastNWidgets(1));
+      expect(find.byType(AmbulanceTrackingView), findsOneWidget);
+      expect(find.text('Ambulans menuju lokasi Anda'), findsOneWidget);
+      expect(find.text('Tiba dalam 5 menit · 1.8 km'), findsOneWidget);
       expect(find.text('Budi Santoso'), findsOneWidget);
       expect(find.text('B 1199 SGM'), findsOneWidget);
-      expect(find.text('Toyota HiAce ALS'), findsOneWidget);
-      expect(find.text('HUBUNGI PENGEMUDI'), findsOneWidget);
+      expect(find.text('ALS · Gawat Darurat'), findsOneWidget);
+      expect(find.text('Langkah 3/5'), findsOneWidget);
+    });
+
+    testWidgets('Cancelling the ambulance asks for a reason', (tester) async {
+      final fakeRepo = _FakeEmergencyRepository()
+        .._current = _trip(EmergencyRequestStatus.enRouteToPickup);
+
+      await _pumpShell(tester, fakeRepo);
+      await tester.tap(find.text('Batalkan'));
+      await _settle(tester);
+
+      // No reason picked yet: the button stays disabled.
+      await tester.tap(find.text('Ya, Batalkan'));
+      await _settle(tester);
+      expect(fakeRepo.calls, isEmpty);
+
+      await tester.tap(find.text('Salah lokasi'));
+      await _settle(tester);
+      await tester.tap(find.text('Ya, Batalkan'));
+      await _settle(tester);
+
+      expect(fakeRepo.calls, ['cancel req-2 Salah lokasi']);
+      expect(find.byType(SosButton), findsOneWidget);
+    });
+
+    testWidgets('Handover at the IGD returns home with a message',
+        (tester) async {
+      final fakeRepo = _FakeEmergencyRepository()
+        .._current = _trip(EmergencyRequestStatus.enRouteToHospital);
+
+      await _pumpShell(tester, fakeRepo);
+
+      expect(find.text('Menuju rumah sakit'), findsWidgets);
+      expect(find.text('RSUD Tarakan sudah diberi tahu'), findsOneWidget);
+
+      fakeRepo._current = _trip(EmergencyRequestStatus.completed);
+      await tester.pump(EmergencyNotifier.pollInterval);
+      await _settle(tester);
+
+      expect(find.byType(AmbulanceTrackingView), findsNothing);
+      expect(
+        find.text(
+          'Pasien telah diserahkan ke IGD RSUD Tarakan. Semoga lekas sembuh!',
+        ),
+        findsOneWidget,
+      );
     });
   });
 }

@@ -52,55 +52,71 @@ class EmergencyLocation {
   }
 }
 
+/// The driver serving the request, from `driver` in the search view.
 class AssignedDriver {
-  const AssignedDriver({
-    required this.id,
-    required this.name,
-    this.phone,
-    this.licenseNumber,
-    this.latitude,
-    this.longitude,
-  });
+  const AssignedDriver({required this.name, this.phone, this.photoUrl});
 
-  final String id;
   final String name;
   final String? phone;
-  final String? licenseNumber;
-  final double? latitude;
-  final double? longitude;
+  final String? photoUrl;
 
   factory AssignedDriver.fromJson(Map<String, dynamic> json) {
-    final location = json['location'] as Map<String, dynamic>?;
     return AssignedDriver(
-      id: json['id'] as String? ?? '',
-      name: json['name'] as String? ?? 'Pengemudi Ambulans',
+      name: json['name'] as String? ?? 'Driver ambulans',
       phone: json['phone'] as String?,
-      licenseNumber: json['license_number'] as String?,
-      latitude: (location?['latitude'] as num?)?.toDouble(),
-      longitude: (location?['longitude'] as num?)?.toDouble(),
+      photoUrl: json['photo_url'] as String?,
     );
   }
 }
 
+/// The ambulance on its way, from `ambulance` in the search view. Its
+/// position is only sent while it serves this request.
 class AmbulanceInfo {
   const AmbulanceInfo({
-    required this.id,
-    required this.plateNumber,
-    this.vehicleModel,
-    this.ambulanceType,
+    this.plateNumber,
+    this.vehicleType,
+    this.latitude,
+    this.longitude,
+    this.locationAgeSeconds,
   });
 
-  final String id;
-  final String plateNumber;
-  final String? vehicleModel;
-  final String? ambulanceType;
+  final String? plateNumber;
+
+  /// e.g. "Ambulans ALS".
+  final String? vehicleType;
+  final double? latitude;
+  final double? longitude;
+
+  /// How long ago the driver last reported that position (server clock).
+  final int? locationAgeSeconds;
+
+  /// After this long without a position, the driver has gone quiet (phone
+  /// off, no signal) and the marker is stale, not moving.
+  static const silentAfterSeconds = 40;
+
+  LatLng? get location => latitude == null || longitude == null
+      ? null
+      : LatLng(latitude!, longitude!);
+
+  bool get isSilent =>
+      location != null && (locationAgeSeconds ?? 0) >= silentAfterSeconds;
+
+  /// "ALS · Gawat Darurat" chip next to the plate.
+  String? get vehicleLabel {
+    final type = vehicleType;
+    if (type == null) return null;
+    if (type.contains('ALS')) return 'ALS · Gawat Darurat';
+    if (type.contains('BLS')) return 'BLS · Dasar';
+    return type;
+  }
 
   factory AmbulanceInfo.fromJson(Map<String, dynamic> json) {
     return AmbulanceInfo(
-      id: json['id'] as String? ?? '',
-      plateNumber: json['plate_number'] as String? ?? 'Ambulans',
-      vehicleModel: json['vehicle_model'] as String?,
-      ambulanceType: json['ambulance_type'] as String?,
+      plateNumber: json['plate_number'] as String?,
+      vehicleType: json['vehicle_type'] as String?,
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
+      locationAgeSeconds: (json['location_age_seconds'] as num?)?.toInt(),
     );
   }
 }
@@ -155,6 +171,8 @@ class EmergencyRequestModel {
     this.nearbyAmbulances = const [],
     this.assignedDriver,
     this.ambulance,
+    this.etaMinutes,
+    this.etaDistanceKm,
     this.reporterName,
     this.reporterPhone,
     this.bloodType,
@@ -192,6 +210,10 @@ class EmergencyRequestModel {
   final AssignedDriver? assignedDriver;
   final AmbulanceInfo? ambulance;
 
+  /// Server's straight-line estimate to where the ambulance heads now.
+  final int? etaMinutes;
+  final double? etaDistanceKm;
+
   /// Person who placed the call (the patient or a relative).
   final String? reporterName;
   final String? reporterPhone;
@@ -210,7 +232,8 @@ class EmergencyRequestModel {
 
   factory EmergencyRequestModel.fromJson(Map<String, dynamic> json) {
     final pickupMap = json['pickup'] as Map<String, dynamic>? ?? {};
-    final driverMap = json['assigned_driver'] as Map<String, dynamic>?;
+    final driverMap = json['driver'] as Map<String, dynamic>?;
+    final etaMap = json['eta'] as Map<String, dynamic>?;
     final ambMap = json['ambulance'] as Map<String, dynamic>?;
     final reporterMap = json['reporter'] as Map<String, dynamic>?;
     final medicalMap = json['medical'] as Map<String, dynamic>?;
@@ -245,6 +268,8 @@ class EmergencyRequestModel {
       ],
       assignedDriver: driverMap != null ? AssignedDriver.fromJson(driverMap) : null,
       ambulance: ambMap != null ? AmbulanceInfo.fromJson(ambMap) : null,
+      etaMinutes: (etaMap?['minutes'] as num?)?.toInt(),
+      etaDistanceKm: (etaMap?['distance_km'] as num?)?.toDouble(),
       reporterName: reporterMap?['name'] as String?,
       reporterPhone: reporterMap?['phone'] as String?,
       bloodType: bloodType == 'unknown' ? null : bloodType,
