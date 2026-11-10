@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../auth/domain/auth_models.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
-import '../../../emergency/domain/emergency_models.dart';
 import '../../../emergency/presentation/providers/emergency_provider.dart';
 import '../../../emergency/presentation/widgets/assigned_driver_card.dart';
 import '../../../emergency/presentation/widgets/searching_ambulance_view.dart';
@@ -18,6 +17,12 @@ class UserShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final emergencyState = ref.watch(emergencyProvider);
+
+    // The search takes the whole screen: map, radius and drivers called.
+    if (emergencyState case EmergencyActive(:final request)
+        when request.status.isSearching) {
+      return SearchingAmbulanceView(request: request);
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -50,9 +55,7 @@ class UserShell extends ConsumerWidget {
               ),
             ),
           EmergencyActive(:final request) =>
-            request.status == EmergencyRequestStatus.searchingDriver
-                ? SearchingAmbulanceView(request: request)
-                : AssignedDriverCard(request: request),
+            AssignedDriverCard(request: request),
           EmergencyError(:final message) => Center(
               child: Padding(
                 padding: const EdgeInsets.all(24.0),

@@ -156,4 +156,16 @@ class _FakeWidgetEmergencyRepo implements EmergencyRepository {
   @override
   Future<EmergencyRequestModel> cancelRequest(String id, {String? reason}) async =>
       throw UnimplementedError();
+
+  @override
+  Future<EmergencyRequestModel> getRequest(String id) async =>
+      throw UnimplementedError();
+
+  @override
+  Future<EmergencyRequestModel> widenRadius(String id) async =>
+      throw UnimplementedError();
+
+  @override
+  Future<EmergencyRequestModel> retrySearch(String id) async =>
+      throw UnimplementedError();
 }

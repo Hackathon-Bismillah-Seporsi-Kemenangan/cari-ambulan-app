@@ -65,5 +65,26 @@ class ApiEmergencyRepository implements EmergencyRepository {
 
     return EmergencyRequestModel.fromJson(data);
   }
-}
 
+  @override
+  Future<EmergencyRequestModel> getRequest(String id) =>
+      _read(_client.get('emergency-requests/$id'));
+
+  @override
+  Future<EmergencyRequestModel> widenRadius(String id) =>
+      _read(_client.post('emergency-requests/$id/radius'));
+
+  @override
+  Future<EmergencyRequestModel> retrySearch(String id) =>
+      _read(_client.post('emergency-requests/$id/retry'));
+
+  Future<EmergencyRequestModel> _read(
+    Future<Map<String, dynamic>?> response,
+  ) async {
+    final data = (await response)?['data'] as Map<String, dynamic>?;
+    if (data == null) {
+      throw const ApiException('Respons server tidak valid');
+    }
+    return EmergencyRequestModel.fromJson(data);
+  }
+}

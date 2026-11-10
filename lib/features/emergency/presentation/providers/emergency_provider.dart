@@ -60,32 +60,62 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
     _pollingTimer = null;
   }
 
-  void _startPolling() {
+  /// Follows the open request by id, so its search progress and the end of
+  /// the trip are seen (`current` only lists open requests).
+  void _startPolling(String id) {
     _stopPolling();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
-      await _pollStatus();
-    });
+    _pollingTimer = Timer.periodic(pollInterval, (_) => _pollStatus(id));
   }
 
-  Future<void> _pollStatus() async {
-    try {
-      final current = await _repository.getCurrentRequest();
-      if (!mounted) return;
+  static const pollInterval = Duration(seconds: 3);
 
-      if (current == null) {
+  Future<void> _pollStatus(String id) async {
+    try {
+      _show(await _repository.getRequest(id));
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      // Gone or not ours any more: nothing left to follow.
+      if (e.statusCode == 404) {
         _stopPolling();
         state = const EmergencyInitial();
-        return;
-      }
-
-      state = EmergencyActive(current);
-
-      if (current.status == EmergencyRequestStatus.completed ||
-          current.status == EmergencyRequestStatus.cancelled) {
-        _stopPolling();
+      } else {
+        AppLog.error('EMERGENCY', 'Failed polling emergency status', e);
       }
     } catch (e) {
       AppLog.error('EMERGENCY', 'Failed polling emergency status', e);
+    }
+  }
+
+  /// Shows [request], or returns home once it is closed.
+  void _show(EmergencyRequestModel request) {
+    if (!mounted) return;
+    if (request.status.isClosed) {
+      _stopPolling();
+      state = const EmergencyInitial();
+    } else {
+      state = EmergencyActive(request);
+    }
+  }
+
+  /// Widens the search to the next radius step.
+  Future<void> widenRadius() => _updateSearch(_repository.widenRadius);
+
+  /// Searches the full radius again after nobody accepted.
+  Future<void> retrySearch() => _updateSearch(_repository.retrySearch);
+
+  Future<void> _updateSearch(
+    Future<EmergencyRequestModel> Function(String id) update,
+  ) async {
+    final current = state;
+    if (current is! EmergencyActive || !current.request.status.isSearching) {
+      return;
+    }
+    try {
+      _show(await update(current.request.id));
+    } on ApiException catch (e) {
+      // 409: a driver accepted meanwhile; the next poll shows the ambulance.
+      AppLog.warn('EMERGENCY', 'Search update failed', e);
+      if (!e.isConflict) rethrow;
     }
   }
 
@@ -95,13 +125,9 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
       final current = await _repository.getCurrentRequest();
       if (!mounted) return;
 
-      if (current != null &&
-          current.status != EmergencyRequestStatus.cancelled &&
-          current.status != EmergencyRequestStatus.completed) {
+      if (current != null && !current.status.isClosed) {
         state = EmergencyActive(current);
-        if (current.status.isSearching) {
-          _startPolling();
-        }
+        _startPolling(current.id);
       } else {
         state = const EmergencyInitial();
       }
@@ -134,7 +160,7 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
 
       if (!mounted) return;
       state = EmergencyActive(request);
-      _startPolling();
+      _startPolling(request.id);
     } on ApiException catch (e) {
       if (!mounted) return;
       if (e.isConflict) {

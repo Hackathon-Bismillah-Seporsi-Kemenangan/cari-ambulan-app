@@ -1,3 +1,5 @@
+import 'package:latlong2/latlong.dart';
+
 enum EmergencyRequestStatus {
   searchingDriver('searching_driver', 'Mencari Ambulans...'),
   driverAssigned('driver_assigned', 'Ambulans Ditugaskan'),
@@ -20,6 +22,9 @@ enum EmergencyRequestStatus {
   }
 
   bool get isSearching => this == EmergencyRequestStatus.searchingDriver;
+  bool get isClosed =>
+      this == EmergencyRequestStatus.completed ||
+      this == EmergencyRequestStatus.cancelled;
   bool get isActiveTrip =>
       this == EmergencyRequestStatus.driverAssigned ||
       this == EmergencyRequestStatus.enRouteToPickup ||
@@ -145,6 +150,9 @@ class EmergencyRequestModel {
     this.patientNotes,
     this.searchRadiusKm = 3,
     this.isExhausted = false,
+    this.driversContacted = 0,
+    this.radiusExpandsInSeconds,
+    this.nearbyAmbulances = const [],
     this.assignedDriver,
     this.ambulance,
     this.reporterName,
@@ -167,8 +175,20 @@ class EmergencyRequestModel {
   final String? emergencyType;
   final String? severityLevel;
   final String? patientNotes;
-  final int searchRadiusKm;
+  /// Radius the server is offering the request in now.
+  final double searchRadiusKm;
+
+  /// Nobody accepted within the largest radius.
   final bool isExhausted;
+
+  /// Drivers the request has been offered to so far.
+  final int driversContacted;
+
+  /// Seconds until the server widens the radius; 0 at the largest one.
+  final int? radiusExpandsInSeconds;
+
+  /// Free ambulances around the pickup, rounded to ~100 m.
+  final List<LatLng> nearbyAmbulances;
   final AssignedDriver? assignedDriver;
   final AmbulanceInfo? ambulance;
 
@@ -190,7 +210,6 @@ class EmergencyRequestModel {
 
   factory EmergencyRequestModel.fromJson(Map<String, dynamic> json) {
     final pickupMap = json['pickup'] as Map<String, dynamic>? ?? {};
-    final searchMap = json['search'] as Map<String, dynamic>? ?? {};
     final driverMap = json['assigned_driver'] as Map<String, dynamic>?;
     final ambMap = json['ambulance'] as Map<String, dynamic>?;
     final reporterMap = json['reporter'] as Map<String, dynamic>?;
@@ -209,8 +228,21 @@ class EmergencyRequestModel {
       emergencyType: json['emergency_type'] as String?,
       severityLevel: json['severity_level'] as String?,
       patientNotes: json['patient_notes'] as String?,
-      searchRadiusKm: (searchMap['radius_km'] as num?)?.toInt() ?? 3,
-      isExhausted: searchMap['is_exhausted'] as bool? ?? false,
+      searchRadiusKm: (json['search_radius_km'] as num?)?.toDouble() ?? 3,
+      isExhausted: json['search_exhausted'] as bool? ?? false,
+      driversContacted: (json['drivers_contacted'] as num?)?.toInt() ?? 0,
+      radiusExpandsInSeconds:
+          (json['radius_expands_in_seconds'] as num?)?.toInt(),
+      nearbyAmbulances: [
+        for (final a in json['nearby_ambulances'] as List? ?? const [])
+          if (a is Map &&
+              a['latitude'] is num &&
+              a['longitude'] is num)
+            LatLng(
+              (a['latitude'] as num).toDouble(),
+              (a['longitude'] as num).toDouble(),
+            ),
+      ],
       assignedDriver: driverMap != null ? AssignedDriver.fromJson(driverMap) : null,
       ambulance: ambMap != null ? AmbulanceInfo.fromJson(ambMap) : null,
       reporterName: reporterMap?['name'] as String?,
