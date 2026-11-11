@@ -11,7 +11,11 @@ import 'medical_id_form_page.dart';
 
 /// "Medical ID": what paramedics see about the patient during an emergency.
 class MedicalIdPage extends ConsumerWidget {
-  const MedicalIdPage({super.key});
+  const MedicalIdPage({super.key, this.inTab = false});
+
+  /// Shown as a tab of the patient shell: no back button, and room for the
+  /// floating tab bar.
+  final bool inTab;
 
   static Future<void> open(BuildContext context) => Navigator.of(
     context,
@@ -31,48 +35,53 @@ class MedicalIdPage extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
-      ),
-      body: switch (medical) {
-        AsyncData(:final value) => RefreshIndicator(
-          onRefresh: () => ref.refresh(medicalProfileProvider.future),
-          child: ListView(
-            padding: EdgeInsets.fromLTRB(
-              16,
-              16,
-              16,
-              MediaQuery.paddingOf(context).bottom + 24,
+      appBar: inTab
+          ? null
+          : AppBar(
+              backgroundColor: AppColors.surface,
+              foregroundColor: AppColors.textPrimary,
+              elevation: 0,
             ),
-            children: [
-              _Header(onEdit: () => edit(context, value)),
-              const SizedBox(height: 20),
-              _PatientCard(name: name, profile: value),
-              const SizedBox(height: 24),
-              _AllergiesAndConditions(
-                profile: value,
-                onAdd: () => edit(context, value),
+      body: SafeArea(
+        bottom: false,
+        child: switch (medical) {
+          AsyncData(:final value) => RefreshIndicator(
+            onRefresh: () => ref.refresh(medicalProfileProvider.future),
+            child: ListView(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                MediaQuery.paddingOf(context).bottom + (inTab ? 120 : 24),
               ),
-              const SizedBox(height: 24),
-              _EmergencyContactSection(
-                contact: value.emergencyContact,
-                onAdd: () => edit(context, value),
-              ),
-              const SizedBox(height: 20),
-              _ShareOnSosTile(profile: value),
-            ],
+              children: [
+                _Header(onEdit: () => edit(context, value)),
+                const SizedBox(height: 20),
+                _PatientCard(name: name, profile: value),
+                const SizedBox(height: 24),
+                _AllergiesAndConditions(
+                  profile: value,
+                  onAdd: () => edit(context, value),
+                ),
+                const SizedBox(height: 24),
+                _EmergencyContactSection(
+                  contact: value.emergencyContact,
+                  onAdd: () => edit(context, value),
+                ),
+                const SizedBox(height: 20),
+                _ShareOnSosTile(profile: value),
+              ],
+            ),
           ),
-        ),
-        AsyncError() => Center(
-          child: TextButton(
-            onPressed: () => ref.invalidate(medicalProfileProvider),
-            child: const Text('Gagal memuat Medical ID. Coba lagi'),
+          AsyncError() => Center(
+            child: TextButton(
+              onPressed: () => ref.invalidate(medicalProfileProvider),
+              child: const Text('Gagal memuat Medical ID. Coba lagi'),
+            ),
           ),
-        ),
-        _ => const Center(child: CircularProgressIndicator()),
-      },
+          _ => const Center(child: CircularProgressIndicator()),
+        },
+      ),
     );
   }
 }

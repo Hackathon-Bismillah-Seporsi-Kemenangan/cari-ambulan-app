@@ -2,22 +2,52 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/widgets/pill_bottom_nav.dart';
 import '../../../auth/domain/auth_models.dart';
-import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../emergency/domain/emergency_models.dart';
 import '../../../emergency/presentation/providers/emergency_provider.dart';
 import '../../../emergency/presentation/widgets/ambulance_tracking_view.dart';
 import '../../../emergency/presentation/widgets/searching_ambulance_view.dart';
-import '../../../emergency/presentation/widgets/sos_button.dart';
-import '../widgets/medical_id_card.dart';
+import 'emergency_history_page.dart';
+import 'medical_id_page.dart';
+import 'user_home_page.dart';
+import 'user_profile_page.dart';
 
-class UserShell extends ConsumerWidget {
+/// Root of the patient role: tabs Beranda / Riwayat / Medical ID / Profil.
+///
+/// An open request takes the whole screen over the tabs: the search, then
+/// the ambulance live on the map.
+class UserShell extends ConsumerStatefulWidget {
   const UserShell({super.key, required this.user});
 
   final AuthUser user;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<UserShell> createState() => _UserShellState();
+}
+
+class _UserShellState extends ConsumerState<UserShell> {
+  static const _historyTab = 1;
+  static const _medicalIdTab = 2;
+
+  int _index = 0;
+
+  /// Tabs are built on first visit, so Riwayat doesn't load at startup.
+  final _visited = {0};
+
+  void _select(int index) {
+    // Show requests finished since the list was last loaded.
+    if (index == _historyTab && index != _index) {
+      ref.invalidate(emergencyHistoryProvider);
+    }
+    setState(() {
+      _index = index;
+      _visited.add(index);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Tell the user how a request ended when it wasn't their own cancel.
     ref.listen<EmergencyState>(emergencyProvider, (_, next) {
       if (next case EmergencyInitial(:final closed?)) {
@@ -35,187 +65,39 @@ class UserShell extends ConsumerWidget {
     });
 
     final emergencyState = ref.watch(emergencyProvider);
-
-    // An open request takes the whole screen: the search, then the
-    // ambulance live on the map.
     if (emergencyState case EmergencyActive(:final request)) {
       return request.status.isSearching
           ? SearchingAmbulanceView(request: request)
           : AmbulanceTrackingView(request: request);
     }
 
+    Widget tab(int index, Widget page) =>
+        _visited.contains(index) ? page : const SizedBox.shrink();
+
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('CariAmbulan'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            tooltip: 'Keluar Akun',
-            icon: const Icon(Icons.logout),
-            onPressed: () => ref.read(authProvider.notifier).logout(),
+      backgroundColor: AppColors.surface,
+      extendBody: true,
+      body: IndexedStack(
+        index: _index,
+        children: [
+          UserHomePage(user: widget.user),
+          tab(_historyTab, const EmergencyHistoryPage()),
+          tab(_medicalIdTab, const MedicalIdPage(inTab: true)),
+          tab(
+            3,
+            UserProfilePage(onOpenMedicalId: () => _select(_medicalIdTab)),
           ),
         ],
       ),
-      body: SafeArea(
-        child: switch (emergencyState) {
-          EmergencyLoading(:final message) => Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(color: AppColors.primary),
-                const SizedBox(height: 16),
-                Text(
-                  message ?? 'Memproses...',
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Shown full screen above.
-          EmergencyActive() => const SizedBox.shrink(),
-          EmergencyError(:final message) => Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.error_outline,
-                    size: 48,
-                    color: AppColors.error,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    message,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => ref
-                        .read(emergencyProvider.notifier)
-                        .checkActiveRequest(),
-                    child: const Text('Kembali ke Beranda'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          EmergencyInitial() => SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Column(
-              children: [
-                // Greeting & Emergency Hotline Banner
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 22,
-                        backgroundColor: AppColors.primaryLight,
-                        child: Text(
-                          user.fullName.isNotEmpty
-                              ? user.fullName[0].toUpperCase()
-                              : 'P',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Halo, ${user.fullName}',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            const Text(
-                              'Pusat Tanggap Darurat Medis 119',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 36),
-
-                // Giant SOS Button in Center
-                const SosButton(),
-
-                const SizedBox(height: 36),
-
-                const MedicalIdCard(),
-
-                const SizedBox(height: 16),
-
-                // Emergency Info Tip
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue.shade100),
-                  ),
-                  child: const Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        color: AppColors.primary,
-                        size: 20,
-                      ),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Tekan tombol SOS di atas jika terjadi kegawatdaruratan medis. Sistem akan otomatis mendeteksi GPS Anda dan mengirimkan ambulans terdekat.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.primaryDark,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        },
+      bottomNavigationBar: PillBottomNav(
+        items: const [
+          (icon: Icons.home_outlined, label: 'Beranda'),
+          (icon: Icons.history_rounded, label: 'Riwayat'),
+          (icon: Icons.badge_outlined, label: 'Medical ID'),
+          (icon: Icons.person_outline_rounded, label: 'Profil'),
+        ],
+        currentIndex: _index,
+        onTap: _select,
       ),
     );
   }
