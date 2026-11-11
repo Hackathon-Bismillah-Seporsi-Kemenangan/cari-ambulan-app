@@ -77,9 +77,9 @@ class _TripNavigationPageState extends ConsumerState<TripNavigationPage> {
 
   /// Live GPS, else the last position sent to the server.
   LatLng _location() {
-    final live = ref.watch(liveLocationProvider).value;
+    final live = ref.watch(liveLocationProvider).valueOrNull;
     if (live != null) return live;
-    final home = ref.watch(driverHomeProvider).value;
+    final home = ref.watch(driverHomeProvider).valueOrNull;
     return LatLng(
       home?.lastBeaconLatitude ?? LocationService.defaultLatitude,
       home?.lastBeaconLongitude ?? LocationService.defaultLongitude,

@@ -10,6 +10,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/map/map_tiles.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../user/presentation/pages/medical_id_form_page.dart';
+import '../../../user/presentation/providers/medical_profile_provider.dart';
+import '../../../user/domain/medical_profile.dart';
 import '../../domain/emergency_models.dart';
 import '../../domain/search_radius.dart';
 import '../providers/emergency_provider.dart';
@@ -61,12 +64,9 @@ class _SearchingAmbulanceViewState
       LatLng(widget.request.pickup.latitude, widget.request.pickup.longitude);
 
   List<_Nearby> get _ambulances => [
-        for (final point in widget.request.nearbyAmbulances)
-          (
-            point: point,
-            km: _distance.as(LengthUnit.Meter, _pickup, point) / 1000,
-          ),
-      ];
+    for (final point in widget.request.nearbyAmbulances)
+      (point: point, km: _distance.as(LengthUnit.Meter, _pickup, point) / 1000),
+  ];
 
   Future<void> _run(Future<void> Function() action, String failure) async {
     setState(() => _isBusy = true);
@@ -80,6 +80,25 @@ class _SearchingAmbulanceViewState
       }
     }
     if (mounted) setState(() => _isBusy = false);
+  }
+
+  /// Rings the Medical ID's emergency contact, or asks to add one.
+  Future<void> _callEmergencyContact() async {
+    final profile = await ref
+        .read(medicalProfileProvider.future)
+        .then<MedicalProfile?>((p) => p, onError: (Object _) => null);
+    if (!mounted) return;
+    final contact = profile?.emergencyContact;
+    if (contact == null) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              MedicalIdFormPage(initial: profile ?? MedicalProfile.empty),
+        ),
+      );
+      return;
+    }
+    await launchUrl(Uri(scheme: 'tel', path: contact.phone));
   }
 
   Future<void> _cancel() async {
@@ -114,8 +133,7 @@ class _SearchingAmbulanceViewState
   Widget build(BuildContext context) {
     final request = widget.request;
     final notifier = ref.read(emergencyProvider.notifier);
-    final elapsed =
-        DateTime.now().difference(request.requestedAt ?? _openedAt);
+    final elapsed = DateTime.now().difference(request.requestedAt ?? _openedAt);
     final ambulances = _ambulances;
 
     return Scaffold(
@@ -166,6 +184,7 @@ class _SearchingAmbulanceViewState
                           notifier.retrySearch,
                           'Gagal mencari lagi. Coba lagi.',
                         ),
+                        onCallContact: _callEmergencyContact,
                         onCancel: _cancel,
                       )
                     : _SearchingSheet(
@@ -308,9 +327,9 @@ class _SearchingSheet extends StatelessWidget {
                     Text(
                       available == 0
                           ? 'Belum ada ambulans siaga dalam '
-                              '${SearchRadius.label(radius)}'
+                                '${SearchRadius.label(radius)}'
                           : '$available ambulans siaga dalam '
-                              '${SearchRadius.label(radius)}',
+                                '${SearchRadius.label(radius)}',
                       style: const TextStyle(
                         fontSize: 13,
                         color: AppColors.ambulanceDark,
@@ -411,8 +430,8 @@ class _RadiusPicker extends StatelessWidget {
                 state: i < current
                     ? _StepState.done
                     : i == current
-                        ? _StepState.active
-                        : _StepState.pending,
+                    ? _StepState.active
+                    : _StepState.pending,
                 onTap: i == current + 1 ? onWiden : null,
               ),
             ),
@@ -504,6 +523,7 @@ class _NoAmbulanceSheet extends StatelessWidget {
     required this.elapsed,
     required this.isBusy,
     required this.onRetry,
+    required this.onCallContact,
     required this.onCancel,
   });
 
@@ -511,6 +531,7 @@ class _NoAmbulanceSheet extends StatelessWidget {
   final Duration elapsed;
   final bool isBusy;
   final VoidCallback onRetry;
+  final VoidCallback onCallContact;
   final VoidCallback onCancel;
 
   @override
@@ -619,21 +640,51 @@ class _NoAmbulanceSheet extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 4),
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: TextButton(
-            onPressed: isBusy ? null : onCancel,
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.textSecondary,
-              textStyle: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 52,
+                child: OutlinedButton.icon(
+                  onPressed: onCallContact,
+                  icon: const Icon(Icons.people_outline_rounded, size: 20),
+                  label: const Text('Kontak darurat'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(
+                      color: AppColors.divider,
+                      width: 1.5,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
               ),
             ),
-            child: const Text('Batalkan'),
-          ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: SizedBox(
+                height: 52,
+                child: TextButton(
+                  onPressed: isBusy ? null : onCancel,
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.textSecondary,
+                    textStyle: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  child: const Text('Batalkan'),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -778,15 +829,14 @@ class _SearchMapState extends State<_SearchMap> {
                 color: exhausted
                     ? AppColors.offline.withValues(alpha: 0.06)
                     : km == steps[current]
-                        ? AppColors.ambulance.withValues(alpha: 0.10)
-                        : AppColors.ambulance.withValues(alpha: 0.03),
+                    ? AppColors.ambulance.withValues(alpha: 0.10)
+                    : AppColors.ambulance.withValues(alpha: 0.03),
                 borderColor: exhausted
                     ? AppColors.textSecondary
                     : km == steps[current]
-                        ? AppColors.ambulance
-                        : AppColors.ambulance.withValues(alpha: 0.35),
-                borderStrokeWidth:
-                    km == steps[current] || exhausted ? 2.5 : 1,
+                    ? AppColors.ambulance
+                    : AppColors.ambulance.withValues(alpha: 0.35),
+                borderStrokeWidth: km == steps[current] || exhausted ? 2.5 : 1,
               ),
           ],
         ),
@@ -818,7 +868,7 @@ class _SearchMapState extends State<_SearchMap> {
                   child: _RingLabel(
                     text: exhausted
                         ? '${SearchRadius.label(km)} · '
-                            '${widget.ambulances.length} tersedia'
+                              '${widget.ambulances.length} tersedia'
                         : SearchRadius.label(km),
                     active: !exhausted && km == steps[current],
                   ),
@@ -910,8 +960,9 @@ class _SearchPulseState extends State<_SearchPulse>
         child: AnimatedBuilder(
           animation: _controller,
           builder: (context, child) => CustomPaint(
-            painter:
-                widget.isSearching ? _PulsePainter(_controller.value) : null,
+            painter: widget.isSearching
+                ? _PulsePainter(_controller.value)
+                : null,
             child: child,
           ),
           child: Center(

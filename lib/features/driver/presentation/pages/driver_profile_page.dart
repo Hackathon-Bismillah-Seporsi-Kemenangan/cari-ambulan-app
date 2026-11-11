@@ -27,7 +27,7 @@ class DriverProfilePage extends ConsumerWidget {
   const DriverProfilePage({super.key});
 
   Future<void> _logout(BuildContext context, WidgetRef ref) async {
-    final profile = ref.read(driverHomeProvider).value?.profile;
+    final profile = ref.read(driverHomeProvider).valueOrNull?.profile;
     if (ref.read(driverTripProvider).hasActiveTrip) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -72,9 +72,9 @@ class DriverProfilePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authProvider).value;
-    final profile = ref.watch(driverHomeProvider).value?.profile;
-    final always = ref.watch(_locationAlwaysProvider).value;
+    final user = ref.watch(authProvider).valueOrNull;
+    final profile = ref.watch(driverHomeProvider).valueOrNull?.profile;
+    final always = ref.watch(_locationAlwaysProvider).valueOrNull;
 
     // White like the patient tabs, so the grey groups and cards stand out.
     return ColoredBox(
