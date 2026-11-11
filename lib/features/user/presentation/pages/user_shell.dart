@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/pill_bottom_nav.dart';
 import '../../../auth/domain/auth_models.dart';
+import '../../../call/domain/call_models.dart';
+import '../../../call/presentation/providers/voice_call_provider.dart';
+import '../../../call/presentation/widgets/active_call_screen.dart';
 import '../../../emergency/domain/emergency_models.dart';
 import '../../../emergency/presentation/providers/emergency_provider.dart';
 import '../../../emergency/presentation/widgets/ambulance_tracking_view.dart';
@@ -35,6 +38,30 @@ class _UserShellState extends ConsumerState<UserShell> {
   /// Tabs are built on first visit, so Riwayat doesn't load at startup.
   final _visited = {0};
 
+  late final VoiceCallNotifier _calls;
+
+  @override
+  void initState() {
+    super.initState();
+    _calls = ref.read(voiceCallProvider.notifier);
+    // The driver can call once an ambulance is on its way.
+    ref.listenManual<EmergencyState>(
+      emergencyProvider,
+      (_, next) => _calls.watchIncoming(
+        next is EmergencyActive && !next.request.status.isSearching,
+        peerRole: 'Driver Ambulans',
+      ),
+      fireImmediately: true,
+    );
+  }
+
+  @override
+  void dispose() {
+    // Signed out: stop asking the server for calls.
+    Future.microtask(() => _calls.watchIncoming(false));
+    super.dispose();
+  }
+
   void _select(int index) {
     // Show requests finished since the list was last loaded.
     if (index == _historyTab && index != _index) {
@@ -61,6 +88,13 @@ class _UserShellState extends ConsumerState<UserShell> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(message)));
+      }
+    });
+
+    ref.listen<VoiceCallState>(voiceCallProvider, (prev, next) {
+      if (next.status == VoiceCallStatus.incoming &&
+          prev?.status != VoiceCallStatus.incoming) {
+        ActiveCallScreen.show(context);
       }
     });
 

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../call/presentation/providers/voice_call_provider.dart';
+import '../../../call/presentation/widgets/call_options_sheet.dart';
 import '../../../emergency/domain/emergency_models.dart';
 import '../../data/routing_repository.dart';
 import '../../domain/route_models.dart';
@@ -25,13 +26,18 @@ class ToPatientPage extends ConsumerStatefulWidget {
 
 class _ToPatientPageState extends ConsumerState<ToPatientPage>
     with StableRouteOrigin {
-  Future<void> _call(String phone) async {
-    final opened = await launchUrl(Uri(scheme: 'tel', path: phone));
-    if (!opened && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tidak dapat membuka aplikasi telepon.')),
-      );
-    }
+  void _callPatient(EmergencyRequestModel trip) {
+    final name = trip.reporterName ?? 'Pasien';
+    showCallOptions(
+      context,
+      name: name,
+      phone: trip.reporterPhone,
+      onInternetCall: () => ref.read(voiceCallProvider.notifier).startCall(
+            requestId: trip.id,
+            peerName: name,
+            peerRole: 'Pasien / Keluarga',
+          ),
+    );
   }
 
   @override
@@ -72,9 +78,7 @@ class _ToPatientPageState extends ConsumerState<ToPatientPage>
           _PatientCard(
             trip: trip,
             distanceMeters: route?.distanceMeters,
-            onCall: trip.reporterPhone == null
-                ? null
-                : () => _call(trip.reporterPhone!),
+            onCall: () => _callPatient(trip),
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
@@ -132,8 +136,7 @@ class _PatientCard extends StatelessWidget {
   final EmergencyRequestModel trip;
   final double? distanceMeters;
 
-  /// Null when the reporter has no phone number.
-  final VoidCallback? onCall;
+  final VoidCallback onCall;
 
   String get _name => trip.reporterName ?? 'Pasien Darurat';
 

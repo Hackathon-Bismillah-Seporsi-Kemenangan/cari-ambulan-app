@@ -9,9 +9,12 @@ import 'api_config.dart';
 
 /// A failed API call, with a message that can be shown to the user.
 class ApiException implements Exception {
-  const ApiException(this.message, {this.statusCode});
+  const ApiException(this.message, {this.statusCode, this.body});
 
   final String message;
+
+  /// The error response, for fields beyond the message.
+  final Map<String, dynamic>? body;
 
   /// Null when the server couldn't be reached.
   final int? statusCode;
@@ -114,7 +117,7 @@ class ApiClient {
     } else {
       AppLog.warn('API', line);
     }
-    throw ApiException(error, statusCode: response.statusCode);
+    throw ApiException(error, statusCode: response.statusCode, body: json);
   }
 
   void _logSuccess(

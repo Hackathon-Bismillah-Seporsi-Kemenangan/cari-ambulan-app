@@ -45,6 +45,9 @@ dependencies:
   url_launcher: ^6.3.3
   vibration: ^3.2.1
   flutter_local_notifications: ^22.3.3
+  # Pinned: 2.4+ fails to compile on Dart 3.13, and 2.6+ needs protobuf 4+,
+  # which clashes with vector_tile (protobuf 3) used by the map.
+  livekit_client: 2.3.1+hotfix.1
 
 dev_dependencies:
   flutter_test:

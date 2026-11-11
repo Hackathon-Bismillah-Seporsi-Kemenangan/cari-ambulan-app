@@ -37,6 +37,11 @@ class AppColors {
   static const Color toastSurface = Color(0xFF141B2B);
   static const Color toastAccent = Color(0xFF6EE7A0);
 
+  // Voice call screen (same palette as the toast)
+  static const Color callSurface = toastSurface;
+  static const Color callSurfaceLight = Color(0xFF26324A);
+  static const Color callAccent = toastAccent;
+
   // Driver availability
   static const Color offline = Color(0xFF9CA3AF);
   static const Color offlineLight = Color(0xFFE5E7EB);

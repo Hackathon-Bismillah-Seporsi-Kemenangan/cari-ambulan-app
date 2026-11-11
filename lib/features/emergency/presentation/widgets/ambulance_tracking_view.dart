@@ -13,6 +13,9 @@ import '../../../driver/data/routing_repository.dart';
 import '../../../driver/domain/route_models.dart';
 import '../../../driver/presentation/widgets/trip_map_layout.dart'
     show StableRouteOrigin;
+import '../../../call/presentation/providers/voice_call_provider.dart';
+import '../../../call/presentation/widgets/active_call_screen.dart';
+import '../../../call/presentation/widgets/call_options_sheet.dart';
 import '../../domain/emergency_models.dart';
 import '../providers/emergency_provider.dart';
 
@@ -132,6 +135,24 @@ class _AmbulanceTrackingViewState extends ConsumerState<AmbulanceTrackingView>
     }
   }
 
+  void _callDriver() {
+    final driver = _request.assignedDriver;
+    final name = driver?.name ?? 'Driver Ambulans';
+    showCallOptions(
+      context,
+      name: name,
+      phone: driver?.phone,
+      onInternetCall: () {
+        ActiveCallScreen.show(context);
+        ref.read(voiceCallProvider.notifier).startCall(
+              requestId: _request.id,
+              peerName: name,
+              peerRole: 'Driver Ambulans',
+            );
+      },
+    );
+  }
+
   Future<void> _cancel() async {
     final reason = await showDialog<String>(
       context: context,
@@ -196,7 +217,6 @@ class _AmbulanceTrackingViewState extends ConsumerState<AmbulanceTrackingView>
     }
     final ambulanceInfo = _request.ambulance;
     final hospitalInfo = _request.hospital;
-    final driverPhone = _request.assignedDriver?.phone;
 
     return Scaffold(
       body: Column(
@@ -280,8 +300,7 @@ class _AmbulanceTrackingViewState extends ConsumerState<AmbulanceTrackingView>
                   etaMinutes: _etaMinutes,
                   distanceKm: _distanceKm,
                   isCancelling: _isCancelling,
-                  onCallDriver:
-                      driverPhone == null ? null : () => _dial(driverPhone),
+                  onCallDriver: _callDriver,
                   onCall119: () => _dial('119'),
                   onCancel: _cancel,
                 ),
@@ -312,8 +331,7 @@ class _TrackingSheet extends StatelessWidget {
   final double? distanceKm;
   final bool isCancelling;
 
-  /// Null when the driver has no phone number.
-  final VoidCallback? onCallDriver;
+  final VoidCallback onCallDriver;
   final VoidCallback onCall119;
   final VoidCallback onCancel;
 

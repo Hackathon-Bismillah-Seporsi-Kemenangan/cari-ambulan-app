@@ -5,6 +5,9 @@ import '../../../../core/alerts/emergency_alert.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/pill_bottom_nav.dart';
 import '../../../auth/domain/auth_models.dart';
+import '../../../call/domain/call_models.dart';
+import '../../../call/presentation/providers/voice_call_provider.dart';
+import '../../../call/presentation/widgets/active_call_screen.dart';
 import '../providers/driver_home_provider.dart';
 import '../providers/driver_offer_provider.dart';
 import '../providers/driver_trip_provider.dart';
@@ -32,8 +35,41 @@ class _DriverShellState extends ConsumerState<DriverShell> {
   /// Tabs are built on first visit, so Riwayat doesn't load at startup.
   final _visited = {0};
 
+  late final VoiceCallNotifier _calls;
+
+  @override
+  void initState() {
+    super.initState();
+    _calls = ref.read(voiceCallProvider.notifier);
+    // The patient can call while a trip is on.
+    ref.listenManual<DriverTripState>(
+      driverTripProvider,
+      (_, next) => _calls.watchIncoming(
+        next.hasActiveTrip,
+        peerRole: 'Pasien / Keluarga',
+      ),
+      fireImmediately: true,
+    );
+  }
+
+  @override
+  void dispose() {
+    // Signed out: stop asking the server for calls.
+    Future.microtask(() => _calls.watchIncoming(false));
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Jawab / Tolak over the map; once picked up, the call goes on in the
+    // bar on the trip sheet.
+    ref.listen<VoiceCallState>(voiceCallProvider, (prev, next) {
+      if (next.status == VoiceCallStatus.incoming &&
+          prev?.status != VoiceCallStatus.incoming) {
+        ActiveCallScreen.show(context, closeOnAnswer: true);
+      }
+    });
+
     ref.listen<AsyncValue<DriverHomeState>>(driverHomeProvider, (prev, next) {
       final isOnline = next.value?.profile.isOnline ?? false;
       final wasOnline = prev?.value?.profile.isOnline ?? false;

@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../../core/map/route_trim.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/map/map_tiles.dart';
+import '../../../call/presentation/widgets/active_call_screen.dart';
 import '../../domain/route_models.dart';
 import 'driver_map.dart';
 
@@ -200,6 +201,8 @@ class TripSheet extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 14),
+              // A call with the patient, over the trip's own buttons.
+              const ActiveCallBar(),
               ...children,
             ],
           ),
