@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/alerts/emergency_alert.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/notifications/push_service.dart';
 import '../../../../core/widgets/pill_bottom_nav.dart';
 import '../../../auth/domain/auth_models.dart';
 import '../../../call/domain/call_models.dart';
@@ -36,6 +39,7 @@ class _DriverShellState extends ConsumerState<DriverShell> {
   final _visited = {0};
 
   late final VoiceCallNotifier _calls;
+  StreamSubscription<PushKind>? _pushes;
 
   @override
   void initState() {
@@ -50,10 +54,20 @@ class _DriverShellState extends ConsumerState<DriverShell> {
       ),
       fireImmediately: true,
     );
+    // A push is only a nudge: ask the server now instead of on the next poll.
+    _pushes = PushService.messages.listen((kind) {
+      switch (kind) {
+        case PushKind.incomingCall:
+          _calls.checkIncoming();
+        case PushKind.emergencyOffer:
+          ref.read(driverOfferProvider.notifier).pollNow();
+      }
+    });
   }
 
   @override
   void dispose() {
+    _pushes?.cancel();
     // Signed out: stop asking the server for calls.
     Future.microtask(() => _calls.watchIncoming(false));
     super.dispose();

@@ -39,6 +39,24 @@ abstract final class EmergencyAlert {
     ticker: 'Panggilan darurat',
   );
 
+  /// A push while the app is closed: the OS plays the sound and vibration,
+  /// since nothing in the app is running to stop a loop.
+  static const _pushChannel = AndroidNotificationDetails(
+    'push_alerts',
+    'Panggilan & order masuk',
+    channelDescription: 'Panggilan dan order darurat saat aplikasi tertutup',
+    importance: Importance.max,
+    priority: Priority.max,
+    category: AndroidNotificationCategory.call,
+    visibility: NotificationVisibility.public,
+    autoCancel: true,
+    // Calls ring out and offers expire after about 30 s.
+    timeoutAfter: 45000,
+    color: Color(0xFFD32F2F),
+  );
+
+  static const _pushNotificationId = 1002;
+
   /// Three hard bursts, then a short pause, repeated: an urgent rhythm a
   /// driver feels even with the phone in a pocket or a dashboard mount.
   static const _vibrationPattern = [0, 500, 120, 500, 120, 500, 500];
@@ -96,12 +114,35 @@ abstract final class EmergencyAlert {
     return vibrating;
   }
 
+  /// Shows a one-off heads-up notification; tapping it opens the app, which
+  /// then finds the call or order by polling. Safe in a background isolate.
+  static Future<void> notify({
+    required String title,
+    required String body,
+  }) async {
+    await _guard(() async {
+      await init();
+      await _notifications.show(
+        id: _pushNotificationId,
+        title: title,
+        body: body,
+        notificationDetails: const NotificationDetails(
+          android: _pushChannel,
+          iOS: DarwinNotificationDetails(
+            interruptionLevel: InterruptionLevel.timeSensitive,
+          ),
+        ),
+      );
+    });
+  }
+
   static Future<void> stop() async {
     _active = false;
     await Future.wait([
       _guard(() => _ringtone.invokeMethod<void>('stop')),
       _guard(Vibration.cancel),
       _guard(() => _notifications.cancel(id: _notificationId)),
+      _guard(() => _notifications.cancel(id: _pushNotificationId)),
     ]);
   }
 

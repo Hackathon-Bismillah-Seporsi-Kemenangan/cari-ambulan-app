@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/notifications/push_service.dart';
 import '../../../../core/widgets/pill_bottom_nav.dart';
 import '../../../auth/domain/auth_models.dart';
 import '../../../call/domain/call_models.dart';
@@ -39,6 +42,7 @@ class _UserShellState extends ConsumerState<UserShell> {
   final _visited = {0};
 
   late final VoiceCallNotifier _calls;
+  StreamSubscription<PushKind>? _pushes;
 
   @override
   void initState() {
@@ -53,10 +57,15 @@ class _UserShellState extends ConsumerState<UserShell> {
       ),
       fireImmediately: true,
     );
+    // A push is only a nudge: ask the server now instead of on the next poll.
+    _pushes = PushService.messages.listen((kind) {
+      if (kind == PushKind.incomingCall) _calls.checkIncoming();
+    });
   }
 
   @override
   void dispose() {
+    _pushes?.cancel();
     // Signed out: stop asking the server for calls.
     Future.microtask(() => _calls.watchIncoming(false));
     super.dispose();

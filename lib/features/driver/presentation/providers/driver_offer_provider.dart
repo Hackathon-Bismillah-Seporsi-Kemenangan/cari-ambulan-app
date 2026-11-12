@@ -66,6 +66,12 @@ class DriverOfferNotifier extends StateNotifier<DriverOfferState> {
     _pollingTimer = Timer.periodic(const Duration(seconds: 3), (_) => _poll());
   }
 
+  /// Checks for an offer now, e.g. when a push says one is coming. Only
+  /// while polling (the driver is online).
+  void pollNow() {
+    if (_pollingTimer != null) _poll();
+  }
+
   void stopPolling() {
     _pollingTimer?.cancel();
     _pollingTimer = null;

@@ -56,12 +56,14 @@ class VoiceCallNotifier extends Notifier<VoiceCallState> {
     }
     _incomingRole = peerRole;
     if (_incomingPoll != null) return;
-    _incomingPoll = Timer.periodic(pollEvery, (_) => _checkIncoming());
-    _checkIncoming();
+    _incomingPoll = Timer.periodic(pollEvery, (_) => checkIncoming());
+    checkIncoming();
   }
 
-  Future<void> _checkIncoming() async {
-    if (_checkingIncoming || state.isActive) return;
+  /// Asks the server for a ringing call now, e.g. when a push says one is
+  /// coming. Only while [watchIncoming] is on.
+  Future<void> checkIncoming() async {
+    if (_incomingPoll == null || _checkingIncoming || state.isActive) return;
     _checkingIncoming = true;
     try {
       final call = await _repo.incoming();

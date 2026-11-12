@@ -2,14 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/constants/app_colors.dart';
+import 'core/notifications/push_service.dart';
 import 'features/auth/domain/auth_models.dart';
 import 'features/auth/presentation/pages/login_page.dart';
 import 'features/auth/presentation/providers/auth_provider.dart';
 import 'features/driver/presentation/pages/driver_shell.dart';
 import 'features/user/presentation/pages/user_shell.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Off unless Firebase settings were given at build time.
+  await PushService.init();
   runApp(const ProviderScope(child: CariAmbulanApp()));
 }
 

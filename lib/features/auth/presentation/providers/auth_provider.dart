@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/logging/app_log.dart';
 import '../../../../core/network/api_providers.dart';
+import '../../../../core/notifications/push_registration.dart';
 import '../../data/auth_repository.dart';
 import '../../domain/auth_models.dart';
 
@@ -25,11 +26,17 @@ class AuthNotifier extends AsyncNotifier<AuthUser?> {
     };
 
     final saved = await _repo.savedSession();
-    if (saved == null) return _repo.restoreSession();
+    if (saved == null) return _signedIn(await _repo.restoreSession());
 
     // Fast load with background verification
     unawaited(_confirm(saved));
-    return saved;
+    return _signedIn(saved);
+  }
+
+  /// Lets the server push calls and orders to this phone.
+  AuthUser? _signedIn(AuthUser? user) {
+    if (user != null) unawaited(ref.read(pushRegistrationProvider).register());
+    return user;
   }
 
   Future<void> _confirm(AuthUser saved) async {
@@ -38,7 +45,11 @@ class AuthNotifier extends AsyncNotifier<AuthUser?> {
       if (state.value?.id != saved.id) return;
       state = AsyncData(user);
     } catch (e) {
-      AppLog.warn('Auth', 'Session verification failed; using saved session', e);
+      AppLog.warn(
+        'Auth',
+        'Session verification failed; using saved session',
+        e,
+      );
     }
   }
 
@@ -46,7 +57,7 @@ class AuthNotifier extends AsyncNotifier<AuthUser?> {
     state = const AsyncLoading();
     try {
       final user = await _repo.login(email, password);
-      state = AsyncData(user);
+      state = AsyncData(_signedIn(user));
     } catch (e, st) {
       state = AsyncError(e, st);
       rethrow;
@@ -57,7 +68,7 @@ class AuthNotifier extends AsyncNotifier<AuthUser?> {
     state = const AsyncLoading();
     try {
       final user = await _repo.register(data);
-      state = AsyncData(user);
+      state = AsyncData(_signedIn(user));
     } catch (e, st) {
       state = AsyncError(e, st);
       rethrow;
@@ -71,8 +82,9 @@ class AuthNotifier extends AsyncNotifier<AuthUser?> {
   }
 
   Future<void> logout() async {
+    // While the session token still works.
+    await ref.read(pushRegistrationProvider).unregister();
     await _repo.logout();
     state = const AsyncData(null);
   }
 }
-
