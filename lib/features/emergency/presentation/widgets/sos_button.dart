@@ -2,10 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../domain/emergency_models.dart';
 import '../providers/emergency_provider.dart';
 
+/// A place the ambulance can be sent instead of the phone's position.
+typedef SavedPlace = ({String label, EmergencyLocation location});
+
 class SosButton extends ConsumerStatefulWidget {
-  const SosButton({super.key});
+  const SosButton({super.key, this.savedPlaces = const []});
+
+  /// Offered in the confirmation as "Kirim ke"; empty shows no choice.
+  final List<SavedPlace> savedPlaces;
 
   @override
   ConsumerState<SosButton> createState() => _SosButtonState();
@@ -38,6 +45,8 @@ class _SosButtonState extends ConsumerState<SosButton>
   void _showSosConfirmation(BuildContext context) {
     String selectedType = 'Darurat Umum';
     final notesController = TextEditingController();
+    // Null sends the ambulance to where the phone is.
+    SavedPlace? selectedPlace;
 
     showModalBottomSheet<void>(
       context: context,
@@ -109,6 +118,48 @@ class _SosButtonState extends ConsumerState<SosButton>
                       ),
                     ],
                   ),
+                  if (widget.savedPlaces.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Kirim ambulans ke:',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildChip(
+                          label: '📍 Lokasi saya sekarang',
+                          selected: selectedPlace == null,
+                          onTap: () =>
+                              setModalState(() => selectedPlace = null),
+                        ),
+                        for (final place in widget.savedPlaces)
+                          _buildChip(
+                            label: place.label,
+                            selected: selectedPlace == place,
+                            onTap: () =>
+                                setModalState(() => selectedPlace = place),
+                          ),
+                      ],
+                    ),
+                    if (selectedPlace case final place?) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        place.location.address,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ],
                   const SizedBox(height: 14),
                   TextField(
                     controller: notesController,
@@ -130,6 +181,7 @@ class _SosButtonState extends ConsumerState<SosButton>
                             notes: notesController.text.trim().isEmpty
                                 ? null
                                 : notesController.text.trim(),
+                            pickup: selectedPlace?.location,
                           );
                     },
                     style: ElevatedButton.styleFrom(

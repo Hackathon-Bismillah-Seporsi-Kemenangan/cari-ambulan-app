@@ -6,10 +6,12 @@ import 'package:cari_ambulan_app/features/auth/presentation/providers/auth_provi
 import 'package:cari_ambulan_app/features/emergency/data/api_emergency_repository.dart';
 import 'package:cari_ambulan_app/features/emergency/data/emergency_repository.dart';
 import 'package:cari_ambulan_app/features/emergency/domain/emergency_models.dart';
+import 'package:cari_ambulan_app/features/user/data/address_repository.dart';
 import 'package:cari_ambulan_app/features/user/data/medical_repository.dart';
 import 'package:cari_ambulan_app/features/user/data/user_repository.dart';
 import 'package:cari_ambulan_app/features/user/domain/emergency_history_item.dart';
 import 'package:cari_ambulan_app/features/user/domain/medical_profile.dart';
+import 'package:cari_ambulan_app/features/user/domain/saved_address.dart';
 import 'package:cari_ambulan_app/features/user/presentation/pages/user_shell.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -53,6 +55,14 @@ class _Medical implements MedicalRepository {
 
   @override
   Future<bool> hasPendingSync() async => false;
+}
+
+class _NoAddresses implements AddressRepository {
+  @override
+  Future<List<SavedAddress>> fetch() async => const [];
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }
 
 class _FakeUserRepo implements UserRepository {
@@ -116,6 +126,7 @@ Future<_FakeUserRepo> _pumpShell(WidgetTester tester) async {
         emergencyRepositoryProvider.overrideWithValue(_NoEmergency()),
         medicalRepositoryProvider.overrideWithValue(_Medical()),
         userRepositoryProvider.overrideWithValue(repo),
+        addressRepositoryProvider.overrideWithValue(_NoAddresses()),
       ],
       child: const MaterialApp(home: UserShell(user: _user)),
     ),

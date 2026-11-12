@@ -5,6 +5,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../auth/domain/auth_models.dart';
 import '../../../emergency/presentation/providers/emergency_provider.dart';
 import '../../../emergency/presentation/widgets/sos_button.dart';
+import '../providers/saved_addresses_provider.dart';
 import '../widgets/medical_id_card.dart';
 
 /// "Beranda": the SOS button and the Medical ID summary.
@@ -16,6 +17,11 @@ class UserHomePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final emergencyState = ref.watch(emergencyProvider);
+    final savedPlaces = <SavedPlace>[
+      for (final address
+          in ref.watch(savedAddressesProvider).valueOrNull ?? const [])
+        (label: address.label, location: address.location),
+    ];
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -141,7 +147,7 @@ class UserHomePage extends ConsumerWidget {
                 const SizedBox(height: 36),
 
                 // Giant SOS Button in Center
-                const SosButton(),
+                SosButton(savedPlaces: savedPlaces),
 
                 const SizedBox(height: 36),
 

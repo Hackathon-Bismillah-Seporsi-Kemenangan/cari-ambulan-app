@@ -11,6 +11,8 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/user_repository.dart';
 import '../../domain/medical_profile.dart';
 import '../providers/medical_profile_provider.dart';
+import '../providers/saved_addresses_provider.dart';
+import '../widgets/saved_addresses_section.dart';
 import 'medical_id_page.dart';
 
 /// Whether location is allowed "Selalu", so it keeps being sent while the
@@ -26,7 +28,7 @@ final _locationAlwaysProvider = FutureProvider.autoDispose<bool>((ref) async {
 /// Unfilled segments of the readiness bar.
 const _readinessTrack = Color(0xFFF7DFA0);
 
-/// "Profil": the account, emergency readiness and settings.
+/// "Profil": the account, emergency readiness, saved addresses and settings.
 class UserProfilePage extends ConsumerWidget {
   const UserProfilePage({super.key, required this.onOpenMedicalId});
 
@@ -67,6 +69,7 @@ class UserProfilePage extends ConsumerWidget {
         onRefresh: () async {
           ref.invalidate(_locationAlwaysProvider);
           ref.invalidate(medicalProfileProvider);
+          ref.invalidate(savedAddressesProvider);
           await ref
               .read(medicalProfileProvider.future)
               .then<void>((_) {}, onError: (Object _) {});
@@ -83,6 +86,8 @@ class UserProfilePage extends ConsumerWidget {
             if (user != null) _AccountHeader(user: user),
             const SizedBox(height: 16),
             _ReadinessCard(medical: medical, onOpenMedicalId: onOpenMedicalId),
+            const SizedBox(height: 22),
+            const SavedAddressesSection(),
             const SizedBox(height: 22),
             const _SectionHeader(title: 'Akun & pengaturan'),
             const SizedBox(height: 8),

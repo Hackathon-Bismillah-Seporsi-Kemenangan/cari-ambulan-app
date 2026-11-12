@@ -140,24 +140,39 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
     }
   }
 
-  /// Trigger emergency SOS call.
+  /// Trigger emergency SOS call, to [pickup] (a saved address) or else to
+  /// where the phone is.
   Future<void> triggerSOS({
     String emergencyType = 'Darurat Umum',
     String? notes,
+    EmergencyLocation? pickup,
   }) async {
-    state = const EmergencyLoading(message: 'Mendeteksi lokasi & memanggil ambulans...');
+    state = EmergencyLoading(
+      message: pickup == null
+          ? 'Mendeteksi lokasi & memanggil ambulans...'
+          : 'Memanggil ambulans ke alamat tersimpan...',
+    );
 
     try {
-      final coords = await _locationService.getCoordinates();
-      final address = await _locationService.getAddressFromCoordinates(
-        coords.latitude,
-        coords.longitude,
-      );
+      final EmergencyLocation at;
+      if (pickup != null) {
+        at = pickup;
+      } else {
+        final coords = await _locationService.getCoordinates();
+        at = EmergencyLocation(
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          address: await _locationService.getAddressFromCoordinates(
+            coords.latitude,
+            coords.longitude,
+          ),
+        );
+      }
 
       final request = await _repository.createEmergencyRequest(
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        address: address,
+        latitude: at.latitude,
+        longitude: at.longitude,
+        address: at.address,
         emergencyType: emergencyType,
         notes: notes,
       );
