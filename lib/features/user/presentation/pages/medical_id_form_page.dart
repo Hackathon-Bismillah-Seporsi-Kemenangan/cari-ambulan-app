@@ -114,6 +114,16 @@ class _MedicalIdFormPageState extends ConsumerState<MedicalIdFormPage> {
         const SnackBar(content: Text('Medical ID tersimpan.')),
       );
       if (mounted) Navigator.of(context).pop();
+    } on MedicalSavedOffline {
+      ref.invalidate(medicalProfileProvider);
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Tersimpan di HP ini. Dikirim ke server saat kembali online.',
+          ),
+        ),
+      );
+      if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);

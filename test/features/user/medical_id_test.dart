@@ -41,6 +41,7 @@ class _FakeMedicalRepo implements MedicalRepository {
   MedicalProfile profile;
   final saved = <MedicalProfile>[];
   bool failSave = false;
+  bool pending = false;
 
   @override
   Future<MedicalProfile> fetch() async => profile;
@@ -51,6 +52,9 @@ class _FakeMedicalRepo implements MedicalRepository {
     saved.add(profile);
     return this.profile = profile;
   }
+
+  @override
+  Future<bool> hasPendingSync() async => pending;
 }
 
 Future<void> _pump(WidgetTester tester, _FakeMedicalRepo repo, Widget home) {
@@ -169,5 +173,18 @@ void main() {
 
     expect(find.text('Server sedang sibuk'), findsOneWidget);
     expect(find.text('Ubah Medical ID'), findsOneWidget);
+  });
+
+  testWidgets('an edit not yet on the server says so', (tester) async {
+    final repo = _FakeMedicalRepo(MedicalProfile.fromJson(_json));
+    await _pump(tester, repo, const MedicalIdPage());
+    await tester.pumpAndSettle();
+    expect(find.textContaining('belum tersinkron'), findsNothing);
+
+    repo.pending = true;
+    await tester.pumpWidget(const SizedBox());
+    await _pump(tester, repo, const MedicalIdPage());
+    await tester.pumpAndSettle();
+    expect(find.textContaining('belum tersinkron'), findsOneWidget);
   });
 }

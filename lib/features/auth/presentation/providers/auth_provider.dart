@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/logging/app_log.dart';
 import '../../../../core/network/api_providers.dart';
 import '../../../../core/notifications/push_registration.dart';
+import '../../../user/data/medical_store.dart';
 import '../../data/auth_repository.dart';
 import '../../domain/auth_models.dart';
 
@@ -85,6 +86,7 @@ class AuthNotifier extends AsyncNotifier<AuthUser?> {
     // While the session token still works.
     await ref.read(pushRegistrationProvider).unregister();
     await _repo.logout();
+    await MedicalStore.clearAll();
     state = const AsyncData(null);
   }
 }

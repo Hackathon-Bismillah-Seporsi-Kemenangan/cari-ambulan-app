@@ -50,6 +50,9 @@ class _Medical implements MedicalRepository {
 
   @override
   Future<MedicalProfile> save(MedicalProfile profile) async => profile;
+
+  @override
+  Future<bool> hasPendingSync() async => false;
 }
 
 class _FakeUserRepo implements UserRepository {

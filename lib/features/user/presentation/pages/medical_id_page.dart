@@ -56,6 +56,11 @@ class MedicalIdPage extends ConsumerWidget {
               ),
               children: [
                 _Header(onEdit: () => edit(context, value)),
+                if (ref.watch(medicalSyncPendingProvider).valueOrNull ??
+                    false) ...[
+                  const SizedBox(height: 12),
+                  const _SyncNotice(),
+                ],
                 const SizedBox(height: 20),
                 _PatientCard(name: name, profile: value),
                 const SizedBox(height: 24),
@@ -81,6 +86,35 @@ class MedicalIdPage extends ConsumerWidget {
           ),
           _ => const Center(child: CircularProgressIndicator()),
         },
+      ),
+    );
+  }
+}
+
+/// An edit made offline, still to be sent.
+class _SyncNotice extends StatelessWidget {
+  const _SyncNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.warningSurface,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.cloud_off_outlined, size: 20, color: AppColors.warning),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Perubahan tersimpan di HP ini dan belum tersinkron ke server. '
+              'Tarik ke bawah untuk mencoba lagi.',
+              style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -437,6 +471,9 @@ class _ShareOnSosTileState extends ConsumerState<_ShareOnSosTile> {
       await ref
           .read(medicalRepositoryProvider)
           .save(widget.profile.copyWith(shareOnSos: value));
+      ref.invalidate(medicalProfileProvider);
+    } on MedicalSavedOffline {
+      // Kept on the phone; the page says it isn't synced yet.
       ref.invalidate(medicalProfileProvider);
     } catch (_) {
       if (mounted) {
