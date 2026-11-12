@@ -18,6 +18,7 @@ import '../../../call/presentation/widgets/active_call_screen.dart';
 import '../../../call/presentation/widgets/call_options_sheet.dart';
 import '../../domain/emergency_models.dart';
 import '../providers/emergency_provider.dart';
+import 'trip_share.dart';
 
 /// Steps of an accepted request, from the server's `status`.
 enum _Stage { toPickup, arrived, toHospital }
@@ -57,10 +58,10 @@ class _AmbulanceTrackingViewState extends ConsumerState<AmbulanceTrackingView>
   EmergencyRequestModel get _request => widget.request;
 
   _Stage get _stage => switch (_request.status) {
-        EmergencyRequestStatus.arriveAtPickup => _Stage.arrived,
-        EmergencyRequestStatus.enRouteToHospital => _Stage.toHospital,
-        _ => _Stage.toPickup,
-      };
+    EmergencyRequestStatus.arriveAtPickup => _Stage.arrived,
+    EmergencyRequestStatus.enRouteToHospital => _Stage.toHospital,
+    _ => _Stage.toPickup,
+  };
 
   LatLng get _pickup =>
       LatLng(_request.pickup.latitude, _request.pickup.longitude);
@@ -135,6 +136,17 @@ class _AmbulanceTrackingViewState extends ConsumerState<AmbulanceTrackingView>
     }
   }
 
+  Future<void> _share() async {
+    try {
+      await shareTrip(_request);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tidak dapat membuka menu bagikan.')),
+      );
+    }
+  }
+
   void _callDriver() {
     final driver = _request.assignedDriver;
     final name = driver?.name ?? 'Driver Ambulans';
@@ -144,7 +156,9 @@ class _AmbulanceTrackingViewState extends ConsumerState<AmbulanceTrackingView>
       phone: driver?.phone,
       onInternetCall: () {
         ActiveCallScreen.show(context);
-        ref.read(voiceCallProvider.notifier).startCall(
+        ref
+            .read(voiceCallProvider.notifier)
+            .startCall(
               requestId: _request.id,
               peerName: name,
               peerRole: 'Driver Ambulans',
@@ -208,8 +222,8 @@ class _AmbulanceTrackingViewState extends ConsumerState<AmbulanceTrackingView>
         : ref.watch(routeProvider((from: routeOrigin(from), to: to))).value;
     // While a re-route after the ambulance moved is loading, keep showing the
     // last route to the same place, so the line and ETA don't blink out.
-    final route =
-        _route = loaded ?? (to != null && to == _routeTo ? _route : null);
+    final route = _route =
+        loaded ?? (to != null && to == _routeTo ? _route : null);
     _routeTo = to;
     if (route != null && route != _fittedRoute) {
       _fittedRoute = route;
@@ -255,17 +269,18 @@ class _AmbulanceTrackingViewState extends ConsumerState<AmbulanceTrackingView>
                       duration: const Duration(milliseconds: 250),
                       child: stage == _Stage.toHospital
                           ? hospitalInfo == null
-                              ? const SizedBox.shrink()
-                              : _HospitalNotice(
-                                  hospital: hospitalInfo,
-                                  preparation: _request.hospitalPreparation,
-                                )
+                                ? const SizedBox.shrink()
+                                : _HospitalNotice(
+                                    hospital: hospitalInfo,
+                                    preparation: _request.hospitalPreparation,
+                                  )
                           : _showFoundToast && stage == _Stage.toPickup
-                              ? const _Toast(
-                                  text: 'Driver ditemukan! Ambulans menuju '
-                                      'lokasi Anda.',
-                                )
-                              : const SizedBox.shrink(),
+                          ? const _Toast(
+                              text:
+                                  'Driver ditemukan! Ambulans menuju '
+                                  'lokasi Anda.',
+                            )
+                          : const SizedBox.shrink(),
                     ),
                   ),
                 ),
@@ -301,6 +316,7 @@ class _AmbulanceTrackingViewState extends ConsumerState<AmbulanceTrackingView>
                   distanceKm: _distanceKm,
                   isCancelling: _isCancelling,
                   onCallDriver: _callDriver,
+                  onShare: _share,
                   onCall119: () => _dial('119'),
                   onCancel: _cancel,
                 ),
@@ -321,6 +337,7 @@ class _TrackingSheet extends StatelessWidget {
     required this.distanceKm,
     required this.isCancelling,
     required this.onCallDriver,
+    required this.onShare,
     required this.onCall119,
     required this.onCancel,
   });
@@ -332,14 +349,15 @@ class _TrackingSheet extends StatelessWidget {
   final bool isCancelling;
 
   final VoidCallback onCallDriver;
+  final VoidCallback onShare;
   final VoidCallback onCall119;
   final VoidCallback onCancel;
 
   String get _title => switch (stage) {
-        _Stage.toPickup => 'Ambulans menuju lokasi Anda',
-        _Stage.arrived => 'Ambulans telah tiba',
-        _Stage.toHospital => 'Menuju rumah sakit',
-      };
+    _Stage.toPickup => 'Ambulans menuju lokasi Anda',
+    _Stage.arrived => 'Ambulans telah tiba',
+    _Stage.toHospital => 'Menuju rumah sakit',
+  };
 
   String get _subtitle {
     final eta = [
@@ -359,7 +377,9 @@ class _TrackingSheet extends StatelessWidget {
       case _Stage.toHospital:
         final hospital = request.hospital?.name;
         return [
-          hospital == null ? 'Pasien sedang dibawa ke IGD' : 'Tujuan: $hospital',
+          hospital == null
+              ? 'Pasien sedang dibawa ke IGD'
+              : 'Tujuan: $hospital',
           ...eta,
         ].join(' · ');
     }
@@ -374,13 +394,29 @@ class _TrackingSheet extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          _title,
-          style: const TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                _title,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.outlined(
+              onPressed: onShare,
+              tooltip: 'Bagikan perjalanan',
+              icon: const Icon(Icons.share_outlined, size: 20),
+              color: AppColors.primary,
+              style: IconButton.styleFrom(
+                side: const BorderSide(color: AppColors.divider, width: 1.5),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 4),
         Text(
@@ -442,16 +478,16 @@ class _ProgressCard extends StatelessWidget {
 
   /// Index of the current step.
   int get _current => switch (stage) {
-        _Stage.toPickup => 2,
-        _Stage.arrived => 3,
-        _Stage.toHospital => 4,
-      };
+    _Stage.toPickup => 2,
+    _Stage.arrived => 3,
+    _Stage.toHospital => 4,
+  };
 
   String get _caption => switch (stage) {
-        _Stage.toPickup => 'Driver menuju lokasi',
-        _Stage.arrived => 'Driver tiba di lokasi',
-        _Stage.toHospital => 'Menuju rumah sakit',
-      };
+    _Stage.toPickup => 'Driver menuju lokasi',
+    _Stage.arrived => 'Driver tiba di lokasi',
+    _Stage.toHospital => 'Menuju rumah sakit',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -493,8 +529,8 @@ class _ProgressCard extends StatelessWidget {
                   state: i < _current
                       ? _StepState.done
                       : i == _current
-                          ? _StepState.active
-                          : _StepState.pending,
+                      ? _StepState.active
+                      : _StepState.pending,
                 ),
                 if (i < _steps.length - 1)
                   Expanded(
@@ -520,17 +556,18 @@ class _ProgressCard extends StatelessWidget {
                     textAlign: i == 0
                         ? TextAlign.left
                         : i == _steps.length - 1
-                            ? TextAlign.right
-                            : TextAlign.center,
+                        ? TextAlign.right
+                        : TextAlign.center,
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight:
-                          i == _current ? FontWeight.w700 : FontWeight.w500,
+                      fontWeight: i == _current
+                          ? FontWeight.w700
+                          : FontWeight.w500,
                       color: i == _current
                           ? AppColors.ambulance
                           : i < _current
-                              ? AppColors.textPrimary
-                              : AppColors.textHint,
+                          ? AppColors.textPrimary
+                          : AppColors.textHint,
                     ),
                   ),
                 ),
@@ -553,15 +590,15 @@ class _StepDot extends StatelessWidget {
     final (background, foreground, border) = switch (state) {
       _StepState.done => (AppColors.success, Colors.white, AppColors.success),
       _StepState.active => (
-          AppColors.ambulance,
-          Colors.white,
-          AppColors.ambulanceSurface,
-        ),
+        AppColors.ambulance,
+        Colors.white,
+        AppColors.ambulanceSurface,
+      ),
       _StepState.pending => (
-          AppColors.surface,
-          AppColors.textHint,
-          AppColors.divider,
-        ),
+        AppColors.surface,
+        AppColors.textHint,
+        AppColors.divider,
+      ),
     };
     return Container(
       width: 30,
@@ -1049,10 +1086,10 @@ class _TrackingMap extends StatelessWidget {
                     label: silentSeconds != null
                         ? 'Sinyal driver hilang · ${_ago(silentSeconds!)}'
                         : arrived
-                            ? 'Telah tiba'
-                            : etaMinutes == null
-                                ? null
-                                : '$etaMinutes menit',
+                        ? 'Telah tiba'
+                        : etaMinutes == null
+                        ? null
+                        : '$etaMinutes menit',
                     arrived: arrived && silentSeconds == null,
                     silent: silentSeconds != null,
                   ),
@@ -1132,8 +1169,8 @@ class _PickupDot extends StatelessWidget {
 String _ago(int seconds) => seconds < 90
     ? '$seconds dtk'
     : seconds < 5400
-        ? '${(seconds / 60).round()} mnt'
-        : '${(seconds / 3600).round()} jam';
+    ? '${(seconds / 60).round()} mnt'
+    : '${(seconds / 3600).round()} jam';
 
 /// Red ambulance pin with a "5 menit" / "Telah tiba" chip above it. The pin
 /// is in the middle of the 136 px marker, so it sits on the point.
@@ -1169,8 +1206,8 @@ class _AmbulanceMarker extends StatelessWidget {
                     color: silent
                         ? AppColors.warning
                         : arrived
-                            ? AppColors.success
-                            : AppColors.toastSurface,
+                        ? AppColors.success
+                        : AppColors.toastSurface,
                     borderRadius: BorderRadius.circular(18),
                   ),
                   child: Row(
@@ -1180,8 +1217,8 @@ class _AmbulanceMarker extends StatelessWidget {
                         silent
                             ? Icons.signal_wifi_off_rounded
                             : arrived
-                                ? Icons.check_circle_outline_rounded
-                                : Icons.schedule_rounded,
+                            ? Icons.check_circle_outline_rounded
+                            : Icons.schedule_rounded,
                         size: 16,
                         color: Colors.white,
                       ),
