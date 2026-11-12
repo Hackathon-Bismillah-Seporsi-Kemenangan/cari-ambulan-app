@@ -37,6 +37,7 @@ dependencies:
   flutter_secure_storage: ^9.2.2
   shared_preferences: ^2.3.3
   geolocator: ^13.0.2
+  geocoding: ^5.0.1
   flutter_map: ^8.3.2
   latlong2: ^0.10.1
   vector_map_tiles: ^9.0.0-beta.13

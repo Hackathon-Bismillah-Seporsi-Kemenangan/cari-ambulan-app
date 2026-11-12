@@ -11,10 +11,10 @@ import '../../domain/emergency_models.dart';
 
 final emergencyProvider =
     StateNotifierProvider<EmergencyNotifier, EmergencyState>((ref) {
-  final repo = ref.watch(emergencyRepositoryProvider);
-  final locationService = ref.watch(locationServiceProvider);
-  return EmergencyNotifier(repo, locationService);
-});
+      final repo = ref.watch(emergencyRepositoryProvider);
+      final locationService = ref.watch(locationServiceProvider);
+      return EmergencyNotifier(repo, locationService);
+    });
 
 sealed class EmergencyState {
   const EmergencyState();
@@ -38,6 +38,12 @@ class EmergencyActive extends EmergencyState {
   final EmergencyRequestModel request;
 }
 
+/// No real position, so nothing was sent: dispatching to a guessed point
+/// would send the ambulance to the wrong place.
+class EmergencyNoLocation extends EmergencyState {
+  const EmergencyNoLocation();
+}
+
 class EmergencyError extends EmergencyState {
   const EmergencyError(this.message);
   final String message;
@@ -45,7 +51,7 @@ class EmergencyError extends EmergencyState {
 
 class EmergencyNotifier extends StateNotifier<EmergencyState> {
   EmergencyNotifier(this._repository, this._locationService)
-      : super(const EmergencyInitial()) {
+    : super(const EmergencyInitial()) {
     checkActiveRequest();
   }
 
@@ -140,6 +146,11 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
     }
   }
 
+  /// Back to the SOS button after [EmergencyNoLocation].
+  void dismissNoLocation() {
+    if (state is EmergencyNoLocation) state = const EmergencyInitial();
+  }
+
   /// Trigger emergency SOS call, to [pickup] (a saved address) or else to
   /// where the phone is.
   Future<void> triggerSOS({
@@ -158,13 +169,17 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
       if (pickup != null) {
         at = pickup;
       } else {
-        final coords = await _locationService.getCoordinates();
+        final fix = await _locationService.emergencyFix();
+        if (fix == null) {
+          if (mounted) state = const EmergencyNoLocation();
+          return;
+        }
         at = EmergencyLocation(
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          address: await _locationService.getAddressFromCoordinates(
-            coords.latitude,
-            coords.longitude,
+          latitude: fix.latitude,
+          longitude: fix.longitude,
+          address: await _locationService.addressOf(
+            fix.latitude,
+            fix.longitude,
           ),
         );
       }

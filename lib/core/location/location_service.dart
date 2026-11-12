@@ -1,5 +1,8 @@
-import 'package:flutter/foundation.dart';
+import 'dart:async';
+
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -80,8 +83,83 @@ class LocationService {
     return (latitude: defaultLatitude, longitude: defaultLongitude);
   }
 
-  Future<String> getAddressFromCoordinates(double latitude, double longitude) async {
-    // In demo / hackathon mode, return readable approximate address
-    return 'Jl. Medan Merdeka Barat No. 17, Jakarta Pusat ($latitude, $longitude)';
+  /// A real position to send an ambulance to: a fresh fix, else the last
+  /// one the phone knows. Null when location is off or denied: never the
+  /// default, which would send the ambulance to the wrong place.
+  Future<({double latitude, double longitude})?> emergencyFix() async {
+    final pos = await getCurrentPosition() ?? await _lastKnown();
+    if (pos == null) return null;
+    return (latitude: pos.latitude, longitude: pos.longitude);
+  }
+
+  Future<Position?> _lastKnown() async {
+    try {
+      return await Geolocator.getLastKnownPosition();
+    } catch (e) {
+      debugPrint('[LocationService] No last known position: $e');
+      return null;
+    }
+  }
+
+  /// The street at a point from the phone's own geocoder (free, no API key),
+  /// e.g. "Jl. Kenanga No. 5". Falls back to the coordinates, so the driver
+  /// still has the exact point when the geocoder is offline or slow.
+  Future<String> addressOf(double latitude, double longitude) async {
+    try {
+      final places = await Geocoding(locale: const Locale('id', 'ID'))
+          .placemarkFromCoordinates(latitude, longitude)
+          .timeout(const Duration(seconds: 4));
+      if (places.isNotEmpty) {
+        final address = formatPlacemark(places.first);
+        if (address != null) return address;
+      }
+    } catch (e) {
+      debugPrint('[LocationService] Reverse geocoding failed: $e');
+    }
+    return coordinatesLabel(latitude, longitude);
+  }
+
+  static String coordinatesLabel(double latitude, double longitude) =>
+      'Titik GPS ${latitude.toStringAsFixed(5)}, '
+      '${longitude.toStringAsFixed(5)}';
+
+  /// Street and number, then the area, e.g. "Jl. Kenanga No. 5, Menteng".
+  static String? formatPlacemark(Placemark place) {
+    bool filled(String? s) => s != null && s.trim().isNotEmpty;
+
+    String? street;
+    final road = place.thoroughfare;
+    if (filled(road)) {
+      final number = place.subThoroughfare;
+      street = !filled(number)
+          ? road
+          // Some geocoders already write "No.39".
+          : number!.toLowerCase().startsWith('no')
+          ? '$road $number'
+          : '$road No. $number';
+    } else if (filled(place.street) && !place.street!.contains('+')) {
+      // Without a road, "street" may be a plus code like "6RQ8+2X".
+      street = place.street;
+    }
+    final area = [
+      place.subLocality,
+      place.locality,
+    ].firstWhere(filled, orElse: () => null);
+    final parts = [?street, if (area != street) ?area];
+    return parts.isEmpty ? null : parts.join(', ');
+  }
+
+  /// Where the user can turn location back on: the phone's location switch
+  /// when it's off, otherwise this app's permissions.
+  Future<void> openSettings() async {
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        await Geolocator.openLocationSettings();
+      } else {
+        await Geolocator.openAppSettings();
+      }
+    } catch (e) {
+      debugPrint('[LocationService] Could not open settings: $e');
+    }
   }
 }

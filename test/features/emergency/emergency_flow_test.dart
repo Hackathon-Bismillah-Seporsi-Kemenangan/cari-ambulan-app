@@ -15,6 +15,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 
+/// GPS at [fix], or off when null; the geocoder names one street.
+class _FakeLocation extends LocationService {
+  _FakeLocation([this.fix = (latitude: -6.19, longitude: 106.82)]);
+
+  final ({double latitude, double longitude})? fix;
+
+  @override
+  Future<({double latitude, double longitude})?> emergencyFix() async => fix;
+
+  @override
+  Future<String> addressOf(double latitude, double longitude) async =>
+      'Jl. Kenanga No. 5, Menteng';
+}
+
 class _FakeEmergencyRepository implements EmergencyRepository {
   EmergencyRequestModel? _current;
   final calls = <String>[];
@@ -44,6 +58,7 @@ class _FakeEmergencyRepository implements EmergencyRepository {
     String? severityLevel,
     String? notes,
   }) async {
+    calls.add('create');
     _current = EmergencyRequestModel(
       id: 'req-123',
       requestCode: 'CA-TEST1',
@@ -240,7 +255,7 @@ void main() {
 
     test('EmergencyNotifier triggers SOS and sets active request', () async {
       final fakeRepo = _FakeEmergencyRepository();
-      final notifier = EmergencyNotifier(fakeRepo, LocationService());
+      final notifier = EmergencyNotifier(fakeRepo, _FakeLocation());
 
       expect(notifier.state, isA<EmergencyInitial>());
 
@@ -249,11 +264,78 @@ void main() {
       expect(notifier.state, isA<EmergencyActive>());
       final active = notifier.state as EmergencyActive;
       expect(active.request.emergencyType, 'Jantung');
+      // The street from the geocoder, at the real GPS point.
+      expect(active.request.pickup.address, 'Jl. Kenanga No. 5, Menteng');
+      expect(active.request.pickup.latitude, -6.19);
       expect(active.request.status, EmergencyRequestStatus.searchingDriver);
 
       await notifier.cancelRequest(reason: 'Batal coba');
       expect(notifier.state, isA<EmergencyInitial>());
       notifier.dispose();
+    });
+  });
+
+  group('no GPS', () {
+    test('nothing is sent to a guessed location', () async {
+      final fakeRepo = _FakeEmergencyRepository();
+      final notifier = EmergencyNotifier(fakeRepo, _FakeLocation(null));
+      await pumpEventQueue();
+
+      await notifier.triggerSOS();
+
+      expect(notifier.state, isA<EmergencyNoLocation>());
+      expect(fakeRepo.calls, isNot(contains('create')));
+      notifier.dismissNoLocation();
+      expect(notifier.state, isA<EmergencyInitial>());
+      notifier.dispose();
+    });
+
+    test('a saved address still works without GPS', () async {
+      final fakeRepo = _FakeEmergencyRepository();
+      final notifier = EmergencyNotifier(fakeRepo, _FakeLocation(null));
+      await pumpEventQueue();
+
+      await notifier.triggerSOS(
+        pickup: const EmergencyLocation(
+          latitude: -6.25,
+          longitude: 106.85,
+          address: 'Jl. Melati 2',
+        ),
+      );
+
+      final active = notifier.state as EmergencyActive;
+      expect(active.request.pickup.address, 'Jl. Melati 2');
+      notifier.dispose();
+    });
+
+    testWidgets('the home screen offers 119 and turning location on', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            emergencyRepositoryProvider.overrideWithValue(
+              _FakeEmergencyRepository(),
+            ),
+            locationServiceProvider.overrideWithValue(_FakeLocation(null)),
+          ],
+          child: const MaterialApp(home: UserShell(user: dummyUser)),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(UserShell)),
+      );
+      await container.read(emergencyProvider.notifier).triggerSOS();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('Lokasi tidak ditemukan'), findsOneWidget);
+      expect(find.text('Telepon 119'), findsOneWidget);
+      expect(find.text('Aktifkan lokasi'), findsOneWidget);
+
+      await tester.tap(find.text('Kembali ke Beranda'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('SOS'), findsOneWidget);
     });
   });
 

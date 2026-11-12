@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/location/location_service.dart';
 import '../../../auth/domain/auth_models.dart';
 import '../../../emergency/presentation/providers/emergency_provider.dart';
 import '../../../emergency/presentation/widgets/sos_button.dart';
@@ -51,6 +53,9 @@ class UserHomePage extends ConsumerWidget {
           ),
           // Shown full screen by the shell.
           EmergencyActive() => const SizedBox.shrink(),
+          EmergencyNoLocation() => _NoLocation(
+            hasSavedPlaces: savedPlaces.isNotEmpty,
+          ),
           EmergencyError(:final message) => Center(
             child: Padding(
               padding: const EdgeInsets.all(24.0),
@@ -189,6 +194,84 @@ class UserHomePage extends ConsumerWidget {
             ),
           ),
         },
+      ),
+    );
+  }
+}
+
+/// SOS found no real position: turn location on, call 119, or go back and
+/// pick a saved address.
+class _NoLocation extends ConsumerWidget {
+  const _NoLocation({required this.hasSavedPlaces});
+
+  final bool hasSavedPlaces;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.location_off_outlined,
+              size: 52,
+              color: AppColors.error,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Lokasi tidak ditemukan',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Ambulans belum dipanggil. Aktifkan lokasi (GPS) agar ambulans '
+              'tahu ke mana harus datang'
+              '${hasSavedPlaces ? ', atau pilih alamat tersimpan' : ''}. '
+              'Jika kritis, segera telepon 119.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: FilledButton.icon(
+                onPressed: () => launchUrl(Uri(scheme: 'tel', path: '119')),
+                icon: const Icon(Icons.phone_in_talk_outlined),
+                label: const Text('Telepon 119'),
+                style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: OutlinedButton.icon(
+                onPressed: () =>
+                    ref.read(locationServiceProvider).openSettings(),
+                icon: const Icon(Icons.my_location_rounded),
+                label: const Text('Aktifkan lokasi'),
+              ),
+            ),
+            const SizedBox(height: 4),
+            TextButton(
+              onPressed: () =>
+                  ref.read(emergencyProvider.notifier).dismissNoLocation(),
+              child: const Text('Kembali ke Beranda'),
+            ),
+          ],
+        ),
       ),
     );
   }
