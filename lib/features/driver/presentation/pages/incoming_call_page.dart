@@ -1,46 +1,39 @@
+import '../../../../core/network/api_client.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/alerts/emergency_alert.dart';
-import '../../../../core/constants/app_colors.dart';
-import '../../domain/dispatch_offer_model.dart';
-import '../providers/driver_home_provider.dart';
-import '../providers/driver_offer_provider.dart';
-import '../providers/driver_trip_provider.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../domain/driver_models.dart';
 import '../widgets/call_countdown.dart';
 
 /// Full-screen "Panggilan Darurat" shown when an emergency order is offered.
 ///
-/// Rings until the driver answers, and closes itself once the offer is gone:
-/// accepted, declined or expired.
-class IncomingCallPage extends ConsumerStatefulWidget {
-  const IncomingCallPage({super.key, required this.offer});
+/// Pops with `true` once [onAccept] succeeds, or `false` after the driver
+/// declines or the offer expires (which calls [onDecline]).
+class IncomingCallPage extends StatefulWidget {
+  const IncomingCallPage({
+    super.key,
+    required this.request,
+    required this.onAccept,
+    required this.onDecline,
+  });
 
-  final DispatchOfferModel offer;
-
-  static Future<void> open(BuildContext context, DispatchOfferModel offer) =>
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          fullscreenDialog: true,
-          builder: (_) => IncomingCallPage(offer: offer),
-        ),
-      );
+  final EmergencyRequest request;
+  final Future<void> Function() onAccept;
+  final Future<void> Function() onDecline;
 
   @override
-  ConsumerState<IncomingCallPage> createState() => _IncomingCallPageState();
+  State<IncomingCallPage> createState() => _IncomingCallPageState();
 }
 
-class _IncomingCallPageState extends ConsumerState<IncomingCallPage> {
-  Timer? _hapticTimer;
-  bool _isClosed = false;
-
-  /// Seconds left when the page opened, for the countdown ring.
-  late final Duration _remaining = Duration(
-    seconds: ref.read(driverOfferProvider).remainingSeconds,
-  );
+class _IncomingCallPageState extends State<IncomingCallPage> {
+  Timer? _alertTimer;
+  bool _isAccepting = false;
+  bool _isClosing = false;
 
   @override
   void initState() {
@@ -54,21 +47,21 @@ class _IncomingCallPageState extends ConsumerState<IncomingCallPage> {
     super.dispose();
   }
 
-  /// Siren, vibration and a notification until the driver responds.
+  /// Ringtone, vibration and a notification until the driver responds.
   Future<void> _startAlert() async {
-    final offer = widget.offer;
+    final request = widget.request;
     final vibrating = await EmergencyAlert.start(
       title: 'Panggilan Darurat',
       body: [
-        if (offer.requestCode.isNotEmpty) 'Order #${offer.requestCode}',
-        offer.emergencyType ?? 'Darurat Medis',
-        '${offer.distanceKm.toStringAsFixed(1)} km',
+        if (request.code != null) 'Order #${request.code}',
+        request.condition,
+        '${request.distanceKm.toStringAsFixed(1)} km',
       ].join(' · '),
     );
     // No vibrator API: tap the haptic engine instead.
-    if (!vibrating && mounted && !_isClosed) {
+    if (!vibrating && mounted && !_isClosing && !_isAccepting) {
       HapticFeedback.heavyImpact();
-      _hapticTimer = Timer.periodic(
+      _alertTimer = Timer.periodic(
         const Duration(milliseconds: 1500),
         (_) => HapticFeedback.heavyImpact(),
       );
@@ -76,56 +69,45 @@ class _IncomingCallPageState extends ConsumerState<IncomingCallPage> {
   }
 
   void _stopAlert() {
-    _hapticTimer?.cancel();
-    _hapticTimer = null;
+    _alertTimer?.cancel();
     EmergencyAlert.stop();
   }
 
-  void _close() {
-    if (_isClosed || !mounted) return;
-    _isClosed = true;
+  Future<void> _accept() async {
+    if (_isAccepting || _isClosing) return;
     _stopAlert();
-    Navigator.of(context).pop();
+    setState(() => _isAccepting = true);
+    try {
+      await widget.onAccept();
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isAccepting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e is ApiException
+                ? e.message
+                : 'Order sudah tidak tersedia atau koneksi bermasalah.',
+          ),
+        ),
+      );
+      _close();
+    }
   }
 
-  Future<void> _accept() async {
+  Future<void> _close() async {
+    if (_isClosing) return;
     _stopAlert();
-    // The page closes as soon as the offer is cleared, so keep what's needed
-    // to start the trip afterwards.
-    final container = ProviderScope.containerOf(context, listen: false);
-    final messenger = ScaffoldMessenger.of(context);
-    final offers = container.read(driverOfferProvider.notifier);
-
-    final trip = await offers.accept();
-    if (trip != null) {
-      container.read(driverTripProvider.notifier).setTrip(trip);
-      // Refresh the profile, now busy.
-      container.invalidate(driverHomeProvider);
-      return;
-    }
-
-    final error = container.read(driverOfferProvider).error;
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          error ?? 'Order sudah tidak tersedia atau koneksi bermasalah.',
-        ),
-      ),
-    );
-    // Taken by another driver or cancelled: drop the call.
-    await offers.decline();
+    setState(() => _isClosing = true);
+    await widget.onDecline();
+    if (mounted) Navigator.of(context).pop(false);
   }
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<DriverOfferState>(driverOfferProvider, (_, next) {
-      if (!next.hasOffer || next.offer?.id != widget.offer.id) _close();
-    });
-
-    final isResponding = ref.watch(
-      driverOfferProvider.select((state) => state.isResponding),
-    );
-    final offer = widget.offer;
+    final request = widget.request;
+    final isBusy = _isAccepting || _isClosing;
 
     return PopScope(
       // The driver must answer; back would silently drop the call.
@@ -133,13 +115,13 @@ class _IncomingCallPageState extends ConsumerState<IncomingCallPage> {
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.light,
         child: Scaffold(
-          backgroundColor: AppColors.ambulanceDark,
+          backgroundColor: AppColors.emergencyDark,
           body: DecoratedBox(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [AppColors.ambulance, AppColors.ambulanceDark],
+                colors: [AppColors.emergency, AppColors.emergencyDark],
                 stops: [0, 0.45],
               ),
             ),
@@ -148,17 +130,18 @@ class _IncomingCallPageState extends ConsumerState<IncomingCallPage> {
                 SafeArea(
                   bottom: false,
                   child: _Header(
-                    remaining: _remaining,
-                    total: offer.offerWindow,
+                    request: request,
+                    // No auto-decline while a response is in flight.
+                    onExpired: isBusy ? null : _close,
                   ),
                 ),
                 Expanded(
                   child: _DetailsCard(
-                    offer: offer,
-                    isResponding: isResponding,
+                    request: request,
+                    isAccepting: _isAccepting,
+                    isBusy: isBusy,
                     onAccept: _accept,
-                    onDecline: () =>
-                        ref.read(driverOfferProvider.notifier).decline(),
+                    onDecline: _close,
                   ),
                 ),
               ],
@@ -171,10 +154,10 @@ class _IncomingCallPageState extends ConsumerState<IncomingCallPage> {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.remaining, required this.total});
+  const _Header({required this.request, required this.onExpired});
 
-  final Duration remaining;
-  final Duration total;
+  final EmergencyRequest request;
+  final VoidCallback? onExpired;
 
   @override
   Widget build(BuildContext context) {
@@ -187,22 +170,23 @@ class _Header extends StatelessWidget {
             children: [
               Icon(Icons.crisis_alert_rounded, color: Colors.white, size: 26),
               SizedBox(width: 10),
-              Flexible(
-                child: Text(
-                  'PANGGILAN DARURAT',
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.2,
-                  ),
+              Text(
+                'PANGGILAN DARURAT',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.2,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 20),
-          CallCountdown(remaining: remaining, total: total),
+          CallCountdown(
+            expiresAt: request.expiresAt,
+            total: request.offerWindow,
+            onExpired: onExpired,
+          ),
           const SizedBox(height: 20),
           Text(
             'Pilih Terima untuk mengambil order.\n'
@@ -222,21 +206,22 @@ class _Header extends StatelessWidget {
 
 class _DetailsCard extends StatelessWidget {
   const _DetailsCard({
-    required this.offer,
-    required this.isResponding,
+    required this.request,
+    required this.isAccepting,
+    required this.isBusy,
     required this.onAccept,
     required this.onDecline,
   });
 
-  final DispatchOfferModel offer;
-  final bool isResponding;
+  final EmergencyRequest request;
+  final bool isAccepting;
+  final bool isBusy;
   final VoidCallback onAccept;
   final VoidCallback onDecline;
 
   @override
   Widget build(BuildContext context) {
-    final notes = offer.patientNotes;
-    final eta = offer.etaMinutes;
+    final hasMedicalId = request.bloodType != null || request.allergy != null;
 
     return Container(
       width: double.infinity,
@@ -258,20 +243,23 @@ class _DetailsCard extends StatelessWidget {
                     children: [
                       _Pill(
                         icon: Icons.monitor_heart_outlined,
-                        label: offer.emergencyType ?? 'Darurat Medis',
+                        label: [
+                          request.condition,
+                          ?request.symptom,
+                        ].join(' · '),
                         foreground: Colors.white,
-                        background: AppColors.ambulance,
+                        background: AppColors.emergency,
                       ),
                       _Pill(
                         icon: Icons.person_outline_rounded,
-                        label: offer.patientName,
+                        label: '${request.patientCount} pasien',
                         foreground: AppColors.textPrimary,
                         background: AppColors.background,
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _PickupRow(address: offer.pickupAddress),
+                  _PickupRow(request: request),
                   const SizedBox(height: 16),
                   Row(
                     children: [
@@ -279,7 +267,7 @@ class _DetailsCard extends StatelessWidget {
                         child: _StatTile(
                           icon: Icons.route_rounded,
                           label: 'Jarak',
-                          value: '${offer.distanceKm.toStringAsFixed(1)} km',
+                          value: '${request.distanceKm.toStringAsFixed(1)} km',
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -287,7 +275,7 @@ class _DetailsCard extends StatelessWidget {
                         child: _StatTile(
                           icon: Icons.schedule_rounded,
                           label: 'ETA',
-                          value: eta == null ? '–' : '$eta menit',
+                          value: '${request.etaMinutes} menit',
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -295,18 +283,18 @@ class _DetailsCard extends StatelessWidget {
                         child: _StatTile(
                           icon: Icons.local_hospital_outlined,
                           label: 'RS terdekat',
-                          value: offer.nearestHospitalName ?? '–',
+                          value: request.nearestHospitalName,
                         ),
                       ),
                     ],
                   ),
-                  if (offer.bloodType != null) ...[
+                  if (hasMedicalId) ...[
                     const SizedBox(height: 12),
-                    _MedicalIdRow(bloodType: offer.bloodType!),
+                    _MedicalIdRow(request: request),
                   ],
-                  if (notes != null && notes.isNotEmpty) ...[
+                  if (request.note != null) ...[
                     const SizedBox(height: 12),
-                    _NoteBox(note: notes),
+                    _NoteBox(note: request.note!),
                   ],
                 ],
               ),
@@ -320,10 +308,10 @@ class _DetailsCard extends StatelessWidget {
               child: Column(
                 children: [
                   FilledButton.icon(
-                    onPressed: isResponding ? null : onAccept,
+                    onPressed: isBusy ? null : onAccept,
                     style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.success,
-                      disabledBackgroundColor: AppColors.success.withValues(
+                      backgroundColor: AppColors.online,
+                      disabledBackgroundColor: AppColors.online.withValues(
                         alpha: 0.6,
                       ),
                       disabledForegroundColor: Colors.white,
@@ -333,7 +321,7 @@ class _DetailsCard extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    icon: isResponding
+                    icon: isAccepting
                         ? const SizedBox.square(
                             dimension: 20,
                             child: CircularProgressIndicator(
@@ -346,7 +334,7 @@ class _DetailsCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   OutlinedButton.icon(
-                    onPressed: isResponding ? null : onDecline,
+                    onPressed: isBusy ? null : onDecline,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.textPrimary,
                       minimumSize: const Size.fromHeight(52),
@@ -413,12 +401,14 @@ class _Pill extends StatelessWidget {
 }
 
 class _PickupRow extends StatelessWidget {
-  const _PickupRow({required this.address});
+  const _PickupRow({required this.request});
 
-  final String address;
+  final EmergencyRequest request;
 
   @override
   Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -426,7 +416,7 @@ class _PickupRow extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: const BoxDecoration(
-            color: AppColors.primarySurface,
+            color: AppColors.primaryLight,
             shape: BoxShape.circle,
           ),
           child: const Icon(
@@ -440,19 +430,20 @@ class _PickupRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Lokasi jemput',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-              ),
+              Text('Lokasi jemput', style: text.bodySmall),
               const SizedBox(height: 2),
               Text(
-                address,
+                request.pickupAddress,
                 style: const TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
                 ),
               ),
+              if (request.pickupDetail != null) ...[
+                const SizedBox(height: 2),
+                Text(request.pickupDetail!, style: text.bodySmall),
+              ],
             ],
           ),
         ),
@@ -517,9 +508,9 @@ class _StatTile extends StatelessWidget {
 }
 
 class _MedicalIdRow extends StatelessWidget {
-  const _MedicalIdRow({required this.bloodType});
+  const _MedicalIdRow({required this.request});
 
-  final String bloodType;
+  final EmergencyRequest request;
 
   @override
   Widget build(BuildContext context) {
@@ -534,20 +525,39 @@ class _MedicalIdRow extends StatelessWidget {
           const Icon(
             Icons.health_and_safety_outlined,
             size: 18,
-            color: AppColors.ambulance,
+            color: AppColors.emergency,
           ),
           const SizedBox(width: 8),
           const Text(
-            'Golongan darah',
+            'Medical ID',
             style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
-          const Spacer(),
-          Text(
-            bloodType,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  if (request.bloodType != null)
+                    TextSpan(
+                      text: request.bloodType,
+                      style: const TextStyle(color: AppColors.textPrimary),
+                    ),
+                  if (request.bloodType != null && request.allergy != null)
+                    const TextSpan(
+                      text: '  ·  ',
+                      style: TextStyle(color: AppColors.textMuted),
+                    ),
+                  if (request.allergy != null)
+                    TextSpan(
+                      text: request.allergy,
+                      style: const TextStyle(color: AppColors.emergency),
+                    ),
+                ],
+              ),
+              textAlign: TextAlign.end,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
             ),
           ),
         ],
@@ -567,7 +577,7 @@ class _NoteBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.warningSurface,
+        color: AppColors.warningLight,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(

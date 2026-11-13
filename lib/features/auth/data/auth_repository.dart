@@ -5,11 +5,11 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../core/network/api_client.dart';
 import '../domain/auth_models.dart';
 
-/// Token login against the Laravel API. The token is kept in secure storage
-/// so the user stays signed in across restarts.
+/// Token login against the Laravel API. The token is kept in the platform
+/// keystore so the user stays signed in across restarts.
 class AuthRepository {
   AuthRepository(this._client, {FlutterSecureStorage? storage})
-      : _storage = storage ?? const FlutterSecureStorage();
+    : _storage = storage ?? const FlutterSecureStorage();
 
   final ApiClient _client;
   final FlutterSecureStorage _storage;
@@ -17,24 +17,29 @@ class AuthRepository {
   static const _tokenKey = 'auth_token';
   static const _userKey = 'auth_user';
 
-  /// Read the saved account from secure storage without network hit.
+  /// The account saved at the last sign-in, read without the network; null
+  /// when signed out or saved by an older app version.
+  /// [restoreSession] should still confirm it.
   Future<AuthUser?> savedSession() async {
+    final (token, saved) = await (
+      _storage.read(key: _tokenKey),
+      _storage.read(key: _userKey),
+    ).wait;
+    if (token == null || saved == null) return null;
     try {
-      final token = await _storage.read(key: _tokenKey);
-      final saved = await _storage.read(key: _userKey);
-      if (token == null || saved == null) return null;
       final user = AuthUser.fromJson(jsonDecode(saved) as Map<String, dynamic>);
       _client.token = token;
       return user;
-    } catch (_) {
+    } on Object {
       return null;
     }
   }
 
+  /// Keeps the saved account in step, e.g. after Profil edits the name.
   Future<void> saveUser(AuthUser user) =>
       _storage.write(key: _userKey, value: jsonEncode(user.toJson()));
 
-  /// Confirm session with GET /auth/me
+  /// The saved session, or null when signed out or the token was revoked.
   Future<AuthUser?> restoreSession() async {
     final token = await _storage.read(key: _tokenKey);
     if (token == null) return null;
@@ -42,9 +47,7 @@ class AuthRepository {
     _client.token = token;
     try {
       final json = await _client.get('auth/me');
-      final data = json?['data'] as Map<String, dynamic>? ?? json;
-      if (data == null) return null;
-      final user = AuthUser.fromJson(data);
+      final user = AuthUser.fromJson(json!['data'] as Map<String, dynamic>);
       await saveUser(user);
       return user;
     } on ApiException catch (e) {
@@ -58,7 +61,7 @@ class AuthRepository {
     final json = await _client.post('auth/login', {
       'email': email,
       'password': password,
-      'device_name': 'cariambulan-app',
+      'device_name': 'medicgo-app',
     });
     return _saveSession(json!);
   }
@@ -66,14 +69,13 @@ class AuthRepository {
   Future<AuthUser> register(RegistrationData data) async {
     final json = await _client.post('auth/register', {
       ...data.toJson(),
-      'device_name': 'cariambulan-app',
+      'device_name': 'medicgo-app',
     });
     return _saveSession(json!);
   }
 
   Future<AuthUser> _saveSession(Map<String, dynamic> json) async {
-    final rawUser = json['user'] ?? json['data'];
-    final user = AuthUser.fromJson(rawUser as Map<String, dynamic>);
+    final user = AuthUser.fromJson(json['user'] as Map<String, dynamic>);
     final token = json['token'] as String;
     await _storage.write(key: _tokenKey, value: token);
     await saveUser(user);
@@ -85,7 +87,7 @@ class AuthRepository {
     try {
       await _client.post('auth/logout');
     } on ApiException {
-      // Offline logout
+      // Signing out locally is enough if the server can't be reached.
     }
     await _clearToken();
   }
@@ -96,4 +98,3 @@ class AuthRepository {
     await _storage.delete(key: _userKey);
   }
 }
-

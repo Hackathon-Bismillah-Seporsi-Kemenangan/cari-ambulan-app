@@ -1,10 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:vibration/vibration.dart';
 
 import '../logging/app_log.dart';
 import '../permissions/permission_requests.dart';
-import 'lock_screen.dart';
 
 /// Rings the driver for a new emergency order: looping siren, urgent
 /// vibration and a heads-up notification, until [stop].
@@ -23,8 +24,6 @@ abstract final class EmergencyAlert {
 
   static const _notificationId = 1001;
 
-  static const _lockReason = 'alert';
-
   /// Ringtone and vibration are played by [start], so the channel is silent.
   static const _channel = AndroidNotificationDetails(
     'emergency_calls',
@@ -38,30 +37,48 @@ abstract final class EmergencyAlert {
     enableVibration: false,
     ongoing: true,
     autoCancel: true,
-    // Opens the order over the lock screen (MainActivity.kt).
-    fullScreenIntent: true,
     color: Color(0xFFD32F2F),
     ticker: 'Panggilan darurat',
   );
 
-  /// A push while the app is closed: the OS plays the sound and vibration,
-  /// since nothing in the app is running to stop a loop.
-  static const _pushChannel = AndroidNotificationDetails(
-    'push_alerts',
-    'Panggilan & order masuk',
+  /// Incoming-call style, like WhatsApp: for a push that arrives with the app
+  /// closed or in the background. The in-app siren (MainActivity.kt) isn't
+  /// reachable from that isolate, so this channel rings by itself (alarm
+  /// sound, vibration) and its full-screen intent wakes the screen and opens
+  /// the app over the lock screen.
+  static const _backgroundChannel = AndroidNotificationDetails(
+    'incoming_call_ring',
+    'Panggilan masuk',
     channelDescription: 'Panggilan dan order darurat saat aplikasi tertutup',
     importance: Importance.max,
     priority: Priority.max,
     category: AndroidNotificationCategory.call,
     visibility: NotificationVisibility.public,
-    autoCancel: true,
-    // Calls ring out and offers expire after about 30 s.
-    timeoutAfter: 45000,
+    playSound: true,
+    enableVibration: true,
+    audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
     fullScreenIntent: true,
+    timeoutAfter: 30000,
+    autoCancel: true,
     color: Color(0xFFD32F2F),
+    ticker: 'Panggilan masuk',
   );
 
-  static const _pushNotificationId = 1002;
+  /// Called with the push data when the user taps the ringing notification
+  /// (or it opens the app full screen).
+  static void Function(Map<String, dynamic> data)? onOpened;
+
+  /// The push that launched a closed app, if any.
+  static Future<Map<String, dynamic>?> launchData() async {
+    try {
+      final details = await _notifications.getNotificationAppLaunchDetails();
+      final payload = details?.notificationResponse?.payload;
+      if (details?.didNotificationLaunchApp == true && payload != null) {
+        return Map<String, dynamic>.from(jsonDecode(payload) as Map);
+      }
+    } catch (_) {}
+    return null;
+  }
 
   /// Three hard bursts, then a short pause, repeated: an urgent rhythm a
   /// driver feels even with the phone in a pocket or a dashboard mount.
@@ -70,7 +87,10 @@ abstract final class EmergencyAlert {
 
   /// Sets up notifications and asks for the Android 13+ permission. Call
   /// once the driver is signed in.
-  static Future<void> init() async {
+  ///
+  /// [requestPermission] is false from a push handler with the app closed:
+  /// there is no Activity there to show the permission dialog.
+  static Future<void> init({bool requestPermission = true}) async {
     if (_initialized) return;
     await _guard(() async {
       await _notifications.initialize(
@@ -78,14 +98,25 @@ abstract final class EmergencyAlert {
           android: AndroidInitializationSettings('@mipmap/ic_launcher'),
           iOS: DarwinInitializationSettings(),
         ),
+        onDidReceiveNotificationResponse: (response) {
+          final payload = response.payload;
+          if (payload == null) return;
+          try {
+            onOpened?.call(
+              Map<String, dynamic>.from(jsonDecode(payload) as Map),
+            );
+          } catch (_) {}
+        },
       );
-      await PermissionRequests.run(
-        () async => _notifications
-            .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin
-            >()
-            ?.requestNotificationsPermission(),
-      );
+      if (requestPermission) {
+        await PermissionRequests.run(
+          () async => _notifications
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >()
+              ?.requestNotificationsPermission(),
+        );
+      }
       _initialized = true;
     });
   }
@@ -95,62 +126,43 @@ abstract final class EmergencyAlert {
   static Future<bool> start({
     required String title,
     required String body,
+    bool background = false,
+    Map<String, dynamic>? data,
   }) async {
     _active = true;
-    final (_, _, _, vibrating) = await (
-      LockScreen.hold(_lockReason),
-      _guard(() => _ringtone.invokeMethod<void>('play')),
+    final (_, _, vibrating) = await (
+      background
+          ? Future.value()
+          : _guard(() => _ringtone.invokeMethod<void>('play')),
       _guard(() async {
-        await init();
+        await init(requestPermission: !background);
         await _notifications.show(
           id: _notificationId,
           title: title,
           body: body,
-          notificationDetails: const NotificationDetails(
-            android: _channel,
+          payload: data == null ? null : jsonEncode(data),
+          notificationDetails: NotificationDetails(
+            android: background ? _backgroundChannel : _channel,
             iOS: DarwinNotificationDetails(
               interruptionLevel: InterruptionLevel.timeSensitive,
             ),
           ),
         );
       }),
-      _startVibration(),
+      // The ringing channel vibrates by itself.
+      background ? Future.value(false) : _startVibration(),
     ).wait;
     // The driver answered before everything started.
     if (!_active) await stop();
     return vibrating;
   }
 
-  /// Shows a one-off heads-up notification; tapping it opens the app, which
-  /// then finds the call or order by polling. Safe in a background isolate.
-  static Future<void> notify({
-    required String title,
-    required String body,
-  }) async {
-    await _guard(() async {
-      await init();
-      await _notifications.show(
-        id: _pushNotificationId,
-        title: title,
-        body: body,
-        notificationDetails: const NotificationDetails(
-          android: _pushChannel,
-          iOS: DarwinNotificationDetails(
-            interruptionLevel: InterruptionLevel.timeSensitive,
-          ),
-        ),
-      );
-    });
-  }
-
   static Future<void> stop() async {
     _active = false;
     await Future.wait([
-      LockScreen.release(_lockReason),
       _guard(() => _ringtone.invokeMethod<void>('stop')),
       _guard(Vibration.cancel),
       _guard(() => _notifications.cancel(id: _notificationId)),
-      _guard(() => _notifications.cancel(id: _pushNotificationId)),
     ]);
   }
 
@@ -174,7 +186,7 @@ abstract final class EmergencyAlert {
     } on MissingPluginException {
       // Widget tests and unsupported platforms.
     } catch (e) {
-      AppLog.warn('ALERT', 'Alarm sound/vibration failed', e);
+      AppLog.warn('Alert', 'Alarm sound/vibration failed', e);
     }
   }
 }

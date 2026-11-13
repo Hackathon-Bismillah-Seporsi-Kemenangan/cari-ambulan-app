@@ -3,23 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../../core/alerts/lock_screen.dart';
 import '../../../../core/network/api_client.dart';
-import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/settings_list.dart';
 import '../../../auth/domain/auth_models.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/driver_models.dart';
 import '../providers/driver_home_provider.dart';
-import '../providers/driver_trip_provider.dart';
 
 /// Whether location is allowed "Selalu", so dispatch keeps seeing the
 /// ambulance while the screen is locked.
-/// Whether a new order may ring over the lock screen.
-final _ringOverLockProvider = FutureProvider.autoDispose<bool?>(
-  (ref) => LockScreen.canRing(),
-);
-
 final _locationAlwaysProvider = FutureProvider.autoDispose<bool>((ref) async {
   try {
     return await Geolocator.checkPermission() == LocationPermission.always;
@@ -33,8 +26,8 @@ class DriverProfilePage extends ConsumerWidget {
   const DriverProfilePage({super.key});
 
   Future<void> _logout(BuildContext context, WidgetRef ref) async {
-    final profile = ref.read(driverHomeProvider).valueOrNull?.profile;
-    if (ref.read(driverTripProvider).hasActiveTrip) {
+    final home = ref.read(driverHomeProvider).value;
+    if (home?.trip != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -59,7 +52,7 @@ class DriverProfilePage extends ConsumerWidget {
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.ambulance),
+            style: TextButton.styleFrom(foregroundColor: AppColors.emergency),
             child: const Text('Keluar'),
           ),
         ],
@@ -67,20 +60,21 @@ class DriverProfilePage extends ConsumerWidget {
     );
     if (confirmed != true) return;
     // Stop receiving calls before the token is revoked.
-    if (profile != null && profile.isOnline) {
+    if (home != null && home.isOnline) {
       await ref
           .read(driverRepositoryProvider)
-          .setAvailability(DriverAvailability.offline)
-          .then<void>((_) {}, onError: (Object _) {});
+          .setAvailability(DriverAvailability.offline, home.location)
+          .catchError((Object _) {});
     }
     await ref.read(authProvider.notifier).logout();
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authProvider).valueOrNull;
-    final profile = ref.watch(driverHomeProvider).valueOrNull?.profile;
-    final always = ref.watch(_locationAlwaysProvider).valueOrNull;
+    final user = ref.watch(authProvider).value;
+    final home = ref.watch(driverHomeProvider).value;
+    final profile = home?.profile;
+    final always = ref.watch(_locationAlwaysProvider).value;
 
     // White like the patient tabs, so the grey groups and cards stand out.
     return ColoredBox(
@@ -90,10 +84,10 @@ class DriverProfilePage extends ConsumerWidget {
         child: RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(_locationAlwaysProvider);
-            ref.invalidate(driverHomeProvider);
             await ref
-                .read(driverHomeProvider.future)
-                .then<void>((_) {}, onError: (Object _) {});
+                .read(driverHomeProvider.notifier)
+                .refreshProfile()
+                .catchError((Object _) {});
           },
           child: ListView(
             padding: EdgeInsets.fromLTRB(
@@ -104,12 +98,9 @@ class DriverProfilePage extends ConsumerWidget {
             ),
             children: [
               if (user != null)
-                _AccountHeader(
-                  user: user,
-                  isOnline: profile?.isOnline ?? false,
-                ),
+                _AccountHeader(user: user, isOnline: home?.isOnline ?? false),
               const SizedBox(height: 16),
-              if (profile != null) _Stats(profile: profile),
+              if (home != null) _Stats(stats: home.stats),
               const SizedBox(height: 22),
               const _SectionTitle('Kendaraan & tugas'),
               const SizedBox(height: 8),
@@ -144,21 +135,6 @@ class DriverProfilePage extends ConsumerWidget {
                     label: 'Notifikasi & suara panggilan',
                     onTap: Geolocator.openAppSettings,
                   ),
-                  if (ref.watch(_ringOverLockProvider).valueOrNull
-                      case final canRing?)
-                    SettingsTile(
-                      icon: Icons.screen_lock_portrait_outlined,
-                      label: 'Tampil di layar kunci',
-                      subtitle: 'Order masuk tetap terlihat saat HP terkunci',
-                      value: canRing ? 'Aktif' : 'Nonaktif',
-                      color: canRing
-                          ? AppColors.textPrimary
-                          : AppColors.ambulance,
-                      onTap: () async {
-                        await LockScreen.allowRinging();
-                        ref.invalidate(_ringOverLockProvider);
-                      },
-                    ),
                   SettingsTile(
                     icon: Icons.my_location_rounded,
                     label: 'Izin lokasi',
@@ -180,7 +156,7 @@ class DriverProfilePage extends ConsumerWidget {
                   SettingsTile(
                     icon: Icons.logout_rounded,
                     label: 'Keluar',
-                    color: AppColors.ambulance,
+                    color: AppColors.emergency,
                     showChevron: false,
                     onTap: () => _logout(context, ref),
                   ),
@@ -219,7 +195,7 @@ class DriverProfilePage extends ConsumerWidget {
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(
                   Icons.phone_in_talk_outlined,
-                  color: AppColors.ambulance,
+                  color: AppColors.emergency,
                 ),
                 title: const Text('Telepon 119'),
                 onTap: () => launchUrl(Uri(scheme: 'tel', path: '119')),
@@ -290,7 +266,7 @@ class _AccountHeader extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   color: isOnline
-                      ? AppColors.successSurface
+                      ? AppColors.onlineLight
                       : AppColors.offlineLight,
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -300,7 +276,7 @@ class _AccountHeader extends StatelessWidget {
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: isOnline
-                        ? AppColors.success
+                        ? AppColors.online
                         : AppColors.textSecondary,
                   ),
                 ),
@@ -324,11 +300,11 @@ class _AccountHeader extends StatelessWidget {
   }
 }
 
-/// Trips completed today and the current availability.
+/// "Hari ini" and "Total selesai" trip counts.
 class _Stats extends StatelessWidget {
-  const _Stats({required this.profile});
+  const _Stats({required this.stats});
 
-  final DriverProfile profile;
+  final DriverTodayStats stats;
 
   @override
   Widget build(BuildContext context) {
@@ -344,8 +320,6 @@ class _Stats extends StatelessWidget {
           children: [
             Text(
               value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.w800,
@@ -366,13 +340,9 @@ class _Stats extends StatelessWidget {
 
     return Row(
       children: [
-        tile('${profile.completedTripsToday ?? '–'}', 'Trip hari ini'),
+        tile('${stats.completedTrips}', 'Trip hari ini'),
         const SizedBox(width: 12),
-        tile(switch (profile.availabilityStatus) {
-          DriverAvailability.online => 'Online',
-          DriverAvailability.busy => 'Bertugas',
-          DriverAvailability.offline => 'Offline',
-        }, 'Status'),
+        tile('${stats.totalCompletedTrips ?? '–'}', 'Total selesai'),
       ],
     );
   }
@@ -440,7 +410,6 @@ class _EditAccountSheetState extends ConsumerState<_EditAccountSheet> {
               fullName: updated.fullName,
               email: user.email,
               phone: updated.phone,
-              alamat: user.alamat,
               roles: user.roles,
             ),
           );
@@ -487,7 +456,7 @@ class _EditAccountSheetState extends ConsumerState<_EditAccountSheet> {
           ),
           if (_error != null) ...[
             const SizedBox(height: 12),
-            Text(_error!, style: const TextStyle(color: AppColors.ambulance)),
+            Text(_error!, style: const TextStyle(color: AppColors.emergency)),
           ],
           const SizedBox(height: 20),
           SizedBox(

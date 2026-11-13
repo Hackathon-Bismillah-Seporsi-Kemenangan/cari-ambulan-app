@@ -3,16 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../../core/constants/app_colors.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/settings_list.dart';
 import '../../../auth/domain/auth_models.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/user_repository.dart';
-import '../../domain/medical_profile.dart';
-import '../providers/medical_profile_provider.dart';
-import '../providers/saved_addresses_provider.dart';
-import '../widgets/saved_addresses_section.dart';
+import '../../domain/user_models.dart';
+import '../providers/user_home_providers.dart';
+import '../widgets/sync_notice.dart';
 import 'medical_id_page.dart';
 
 /// Whether location is allowed "Selalu", so it keeps being sent while the
@@ -25,69 +24,51 @@ final _locationAlwaysProvider = FutureProvider.autoDispose<bool>((ref) async {
   }
 });
 
-/// Unfilled segments of the readiness bar.
-const _readinessTrack = Color(0xFFF7DFA0);
-
-/// "Profil": the account, emergency readiness, saved addresses and settings.
+/// "Profil": the account, emergency readiness, saved addresses, settings.
 class UserProfilePage extends ConsumerWidget {
   const UserProfilePage({super.key, required this.onOpenMedicalId});
 
   final VoidCallback onOpenMedicalId;
 
-  Future<void> _logout(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Keluar dari akun?'),
-        content: const Text(
-          'Anda perlu masuk lagi untuk memanggil ambulans dari aplikasi.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Batal'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.ambulance),
-            child: const Text('Keluar'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) await ref.read(authProvider.notifier).logout();
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authProvider).valueOrNull;
-    final medical = ref.watch(medicalProfileProvider).valueOrNull;
+    final user = ref.watch(authProvider).value;
+    final medical = ref.watch(medicalProfileProvider).value?.value;
+    final addresses = ref.watch(savedAddressesProvider);
 
     return SafeArea(
       bottom: false,
       child: RefreshIndicator(
         onRefresh: () async {
-          ref.invalidate(_locationAlwaysProvider);
-          ref.invalidate(medicalProfileProvider);
-          ref.invalidate(savedAddressesProvider);
-          await ref
-              .read(medicalProfileProvider.future)
-              .then<void>((_) {}, onError: (Object _) {});
+          ref
+            ..invalidate(medicalProfileProvider)
+            ..invalidate(_locationAlwaysProvider)
+            ..invalidate(savedAddressesProvider);
+          await ref.read(savedAddressesProvider.future);
         },
         child: ListView(
           padding: EdgeInsets.fromLTRB(
             16,
             16,
             16,
-            // Room for the floating tab bar.
-            MediaQuery.paddingOf(context).bottom + 120,
+            MediaQuery.paddingOf(context).bottom + 24,
           ),
           children: [
             if (user != null) _AccountHeader(user: user),
             const SizedBox(height: 16),
-            _ReadinessCard(medical: medical, onOpenMedicalId: onOpenMedicalId),
+            _ReadinessCard(
+              medical: medical,
+              hasHome: addresses.value?.value.isNotEmpty ?? false,
+              onOpenMedicalId: onOpenMedicalId,
+            ),
             const SizedBox(height: 22),
-            const SavedAddressesSection(),
+            _SectionHeader(
+              title: 'Alamat tersimpan',
+              action: '+ Tambah',
+              onAction: () => _AddAddressSheet.show(context),
+            ),
+            const SizedBox(height: 8),
+            _AddressList(addresses: addresses),
             const SizedBox(height: 22),
             const _SectionHeader(title: 'Akun & pengaturan'),
             const SizedBox(height: 8),
@@ -96,7 +77,9 @@ class UserProfilePage extends ConsumerWidget {
                 SettingsTile(
                   icon: Icons.people_outline_rounded,
                   label: 'Kontak darurat',
-                  value: medical?.emergencyContact?.name ?? 'Belum ada',
+                  value: medical?.emergencyContact == null
+                      ? 'Belum ada'
+                      : '1 kontak',
                   onTap: () => MedicalIdPage.edit(
                     context,
                     medical ?? MedicalProfile.empty,
@@ -111,9 +94,9 @@ class UserProfilePage extends ConsumerWidget {
                     medical ?? MedicalProfile.empty,
                   ),
                 ),
-                const SettingsTile(
+                SettingsTile(
                   icon: Icons.notifications_active_outlined,
-                  label: 'Notifikasi & izin lokasi',
+                  label: 'Notifikasi & suara darurat',
                   onTap: Geolocator.openAppSettings,
                 ),
                 SettingsTile(
@@ -124,9 +107,9 @@ class UserProfilePage extends ConsumerWidget {
                 SettingsTile(
                   icon: Icons.logout_rounded,
                   label: 'Keluar',
-                  color: AppColors.ambulance,
+                  color: AppColors.emergency,
                   showChevron: false,
-                  onTap: () => _logout(context, ref),
+                  onTap: () => ref.read(authProvider.notifier).logout(),
                 ),
               ],
             ),
@@ -162,7 +145,7 @@ class UserProfilePage extends ConsumerWidget {
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(
                   Icons.phone_in_talk_outlined,
-                  color: AppColors.ambulance,
+                  color: AppColors.emergency,
                 ),
                 title: const Text('Telepon 119'),
                 onTap: () => launchUrl(Uri(scheme: 'tel', path: '119')),
@@ -193,7 +176,7 @@ class _AccountHeader extends ConsumerWidget {
       children: [
         CircleAvatar(
           radius: 32,
-          backgroundColor: AppColors.ambulance,
+          backgroundColor: AppColors.emergency,
           child: Text(
             _initials,
             style: const TextStyle(
@@ -245,15 +228,19 @@ class _AccountHeader extends ConsumerWidget {
 
 /// "Kesiapan darurat · 3 dari 4" with the next thing to fix.
 class _ReadinessCard extends ConsumerWidget {
-  const _ReadinessCard({required this.medical, required this.onOpenMedicalId});
+  const _ReadinessCard({
+    required this.medical,
+    required this.hasHome,
+    required this.onOpenMedicalId,
+  });
 
   final MedicalProfile? medical;
+  final bool hasHome;
   final VoidCallback onOpenMedicalId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final locationAlways =
-        ref.watch(_locationAlwaysProvider).valueOrNull ?? false;
+    final locationAlways = ref.watch(_locationAlwaysProvider).value ?? false;
     final medical = this.medical;
 
     final checks = [
@@ -282,6 +269,13 @@ class _ReadinessCard extends ConsumerWidget {
           ref.invalidate(_locationAlwaysProvider);
         },
       ),
+      (
+        done: hasHome,
+        title: 'Simpan alamat rumah',
+        subtitle: 'Lokasi jemput lebih cepat dipilih',
+        action: 'Simpan',
+        onTap: () => _AddAddressSheet.show(context),
+      ),
     ];
     final doneCount = checks.where((c) => c.done).length;
     final next = checks.where((c) => !c.done).firstOrNull;
@@ -289,9 +283,9 @@ class _ReadinessCard extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.warningSurface,
+        color: AppColors.warningLight,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _readinessTrack),
+        border: Border.all(color: const Color(0xFFF7DFA0)),
       ),
       child: Column(
         children: [
@@ -333,8 +327,8 @@ class _ReadinessCard extends ConsumerWidget {
                     height: 5,
                     decoration: BoxDecoration(
                       color: i < doneCount
-                          ? AppColors.success
-                          : _readinessTrack,
+                          ? AppColors.online
+                          : const Color(0xFFF7DFA0),
                       borderRadius: BorderRadius.circular(3),
                     ),
                   ),
@@ -397,18 +391,200 @@ class _ReadinessCard extends ConsumerWidget {
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title});
+  const _SectionHeader({required this.title, this.action, this.onAction});
 
   final String title;
+  final String? action;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 17,
-        fontWeight: FontWeight.w700,
-        color: AppColors.textPrimary,
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+        if (action != null)
+          TextButton(
+            onPressed: onAction,
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              textStyle: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            child: Text(action!),
+          ),
+      ],
+    );
+  }
+}
+
+class _AddressList extends StatelessWidget {
+  const _AddressList({required this.addresses});
+
+  final AsyncValue<Synced<List<SavedAddress>>> addresses;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = addresses.value;
+    if (value == null) {
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    return Column(
+      children: [
+        if (!value.synced && value.value.isNotEmpty) ...[
+          const SyncNotice(),
+          const SizedBox(height: 8),
+        ],
+        SettingsGroup(
+          children: [
+            if (value.value.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  'Belum ada alamat tersimpan',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+              ),
+            for (final address in value.value)
+              SettingsTile(
+                icon: switch (address.label) {
+                  'Rumah' => Icons.home_outlined,
+                  'Kantor' => Icons.business_outlined,
+                  _ => Icons.place_outlined,
+                },
+                label: address.label,
+                subtitle: address.address,
+                iconBackground: AppColors.primaryLight,
+                iconColor: AppColors.primary,
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Saves the current GPS position as "Rumah", "Kantor" or another label.
+class _AddAddressSheet extends ConsumerStatefulWidget {
+  const _AddAddressSheet();
+
+  static Future<void> show(BuildContext context) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (_) => const _AddAddressSheet(),
+  );
+
+  @override
+  ConsumerState<_AddAddressSheet> createState() => _AddAddressSheetState();
+}
+
+class _AddAddressSheetState extends ConsumerState<_AddAddressSheet> {
+  static const _labels = ['Rumah', 'Kantor', 'Lainnya'];
+
+  String _label = _labels.first;
+  final _address = TextEditingController();
+  bool _addressFilled = false;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _address.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final fix = ref.read(userLocationProvider).value;
+    final address = _address.text.trim();
+    if (fix == null || address.isEmpty) return;
+    setState(() => _saving = true);
+    final synced = await ref
+        .read(userRepositoryProvider)
+        .addAddress(
+          SavedAddress(label: _label, address: address, location: fix.point),
+        );
+    ref.invalidate(savedAddressesProvider);
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          synced
+              ? 'Alamat tersimpan.'
+              : 'Alamat tersimpan di HP ini. Belum tersinkron ke server.',
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fix = ref.watch(userLocationProvider).value;
+    final found = ref.watch(pickupAddressProvider).value;
+    if (!_addressFilled && found != null) {
+      _addressFilled = true;
+      _address.text = found;
+    }
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        0,
+        20,
+        MediaQuery.viewInsetsOf(context).bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Simpan lokasi saat ini',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            fix == null
+                ? 'Mencari lokasi GPS…'
+                : 'Titik GPS Anda sekarang akan disimpan.',
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            children: [
+              for (final label in _labels)
+                ChoiceChip(
+                  label: Text(label),
+                  selected: _label == label,
+                  onSelected: (_) => setState(() => _label = label),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _address,
+            decoration: const InputDecoration(labelText: 'Alamat'),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: FilledButton(
+              onPressed: fix == null || _saving ? null : _save,
+              child: const Text('Simpan'),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -445,7 +621,7 @@ class _EditAccountSheetState extends ConsumerState<_EditAccountSheet> {
     try {
       final updated = await ref
           .read(userRepositoryProvider)
-          .updateAccount(
+          .updateProfile(
             fullName: _name.text.trim(),
             phone: _phone.text.trim(),
           );
@@ -458,7 +634,6 @@ class _EditAccountSheetState extends ConsumerState<_EditAccountSheet> {
               fullName: updated.fullName,
               email: user.email,
               phone: updated.phone,
-              alamat: user.alamat,
               roles: user.roles,
             ),
           );
@@ -467,9 +642,9 @@ class _EditAccountSheetState extends ConsumerState<_EditAccountSheet> {
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _error = e is ApiException
+        _error = e is ApiException && e.statusCode != 404
             ? e.message
-            : 'Gagal menyimpan profil. Coba lagi.';
+            : 'Mengubah profil belum didukung server.';
       });
     }
   }
@@ -505,7 +680,7 @@ class _EditAccountSheetState extends ConsumerState<_EditAccountSheet> {
           ),
           if (_error != null) ...[
             const SizedBox(height: 12),
-            Text(_error!, style: const TextStyle(color: AppColors.ambulance)),
+            Text(_error!, style: const TextStyle(color: AppColors.emergency)),
           ],
           const SizedBox(height: 20),
           SizedBox(

@@ -1,79 +1,101 @@
 enum VoiceCallStatus {
   idle,
 
-  /// The other side is calling this phone; waiting for Jawab / Tolak.
+  /// Someone is calling this phone; waiting for Jawab / Tolak.
   incoming,
-
-  /// Creating the call on the server.
   dialing,
-
-  /// The other phone is ringing.
   ringing,
   connected,
   ended,
 }
 
-/// A call between the patient and the driver of an active trip
-/// (`TripCallResource`).
-class TripCall {
-  const TripCall({
-    required this.id,
-    required this.status,
-    this.callerName = '',
+class CallSignalData {
+  const CallSignalData({
+    required this.callId,
+    required this.senderId,
+    required this.type,
+    required this.data,
   });
 
-  factory TripCall.fromJson(Map<String, dynamic> json) => TripCall(
-    id: json['id'] as String,
-    status: json['status'] as String? ?? 'ringing',
+  factory CallSignalData.fromJson(Map<String, dynamic> json) {
+    return CallSignalData(
+      callId: json['call_id'] as String? ?? '',
+      senderId: json['sender_id'] as String? ?? '',
+      type: json['type'] as String? ?? '',
+      data: json['data'],
+    );
+  }
+
+  final String callId;
+  final String senderId;
+  final String type;
+  final dynamic data;
+}
+
+/// A call ringing for this phone, placed by the other side of the order.
+class IncomingCall {
+  const IncomingCall({
+    required this.id,
+    required this.callerName,
+    this.token,
+    this.roomName,
+    this.livekitUrl,
+  });
+
+  factory IncomingCall.fromJson(Map<String, dynamic> json) => IncomingCall(
+    id: (json['id'] as String? ?? json['call_id'] as String?) ?? '',
     callerName:
-        (json['caller'] as Map<String, dynamic>?)?['name'] as String? ?? '',
+        (json['caller'] as Map<String, dynamic>?)?['name'] as String? ??
+        json['caller_name'] as String? ??
+        '',
+    token: json['token'] as String? ?? json['livekit_token'] as String?,
+    roomName: json['room_name'] as String? ?? json['room'] as String?,
+    livekitUrl: json['livekit_url'] as String?,
   );
 
   final String id;
-
-  /// `ringing`, `answered`, `ended`, `declined` or `missed`.
-  final String status;
   final String callerName;
-
-  bool get isOver =>
-      status == 'ended' || status == 'declined' || status == 'missed';
+  final String? token;
+  final String? roomName;
+  final String? livekitUrl;
 }
-
-/// Where to join the call's audio room.
-typedef CallConnection = ({String url, String token});
 
 class VoiceCallState {
   const VoiceCallState({
     required this.status,
     this.callId,
+    this.emergencyRequestId,
     this.peerName = '',
     this.peerRole = '',
     this.isCaller = false,
     this.isMuted = false,
     this.isSpeaker = true,
-    this.audioConnected = false,
     this.duration = Duration.zero,
     this.errorMessage,
+    this.audioConnected = false,
+    this.token,
+    this.roomName,
+    this.livekitUrl,
   });
 
   const VoiceCallState.idle() : this(status: VoiceCallStatus.idle);
 
   final VoiceCallStatus status;
   final String? callId;
+  final String? emergencyRequestId;
   final String peerName;
-
-  /// Shown when the peer's name is unknown: "Driver Ambulans", "Pasien".
   final String peerRole;
   final bool isCaller;
   final bool isMuted;
   final bool isSpeaker;
-
-  /// The audio path is up.
-  final bool audioConnected;
   final Duration duration;
   final String? errorMessage;
 
-  String get displayName => peerName.isEmpty ? peerRole : peerName;
+  /// The audio path is up via LiveKit.
+  final bool audioConnected;
+  final String? token;
+  final String? roomName;
+  final String? livekitUrl;
 
   bool get isActive =>
       status == VoiceCallStatus.incoming ||
@@ -84,23 +106,34 @@ class VoiceCallState {
   VoiceCallState copyWith({
     VoiceCallStatus? status,
     String? callId,
+    String? emergencyRequestId,
+    String? peerName,
+    String? peerRole,
+    bool? isCaller,
     bool? isMuted,
     bool? isSpeaker,
-    bool? audioConnected,
     Duration? duration,
     String? errorMessage,
+    bool? audioConnected,
+    String? token,
+    String? roomName,
+    String? livekitUrl,
   }) {
     return VoiceCallState(
       status: status ?? this.status,
       callId: callId ?? this.callId,
-      peerName: peerName,
-      peerRole: peerRole,
-      isCaller: isCaller,
+      emergencyRequestId: emergencyRequestId ?? this.emergencyRequestId,
+      peerName: peerName ?? this.peerName,
+      peerRole: peerRole ?? this.peerRole,
+      isCaller: isCaller ?? this.isCaller,
       isMuted: isMuted ?? this.isMuted,
       isSpeaker: isSpeaker ?? this.isSpeaker,
-      audioConnected: audioConnected ?? this.audioConnected,
       duration: duration ?? this.duration,
       errorMessage: errorMessage ?? this.errorMessage,
+      audioConnected: audioConnected ?? this.audioConnected,
+      token: token ?? this.token,
+      roomName: roomName ?? this.roomName,
+      livekitUrl: livekitUrl ?? this.livekitUrl,
     );
   }
 }

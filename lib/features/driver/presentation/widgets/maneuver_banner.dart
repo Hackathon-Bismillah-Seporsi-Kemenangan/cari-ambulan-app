@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../domain/route_models.dart';
 
 /// "300 m" / "1.8 km", rounded like a navigation app.
@@ -73,7 +73,7 @@ class ManeuverBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
       decoration: BoxDecoration(
-        color: arrived ? AppColors.success : AppColors.primary,
+        color: arrived ? AppColors.online : AppColors.primary,
         borderRadius: BorderRadius.circular(16),
         boxShadow: const [
           BoxShadow(

@@ -2,15 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
-import '../../../../core/constants/app_colors.dart';
-import '../../data/user_repository.dart';
-import '../../domain/emergency_history_item.dart';
-
-/// Riwayat; reloaded when the tab is opened or pulled down.
-final emergencyHistoryProvider =
-    FutureProvider.autoDispose<List<EmergencyHistoryItem>>(
-      (ref) => ref.watch(userRepositoryProvider).fetchHistory(),
-    );
+import '../../../../core/theme/app_colors.dart';
+import '../../domain/user_models.dart';
+import '../providers/user_home_providers.dart';
 
 /// "Riwayat": the user's past ambulance requests.
 class EmergencyHistoryPage extends ConsumerWidget {
@@ -19,8 +13,7 @@ class EmergencyHistoryPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final history = ref.watch(emergencyHistoryProvider);
-    // Room for the floating tab bar.
-    final bottom = MediaQuery.paddingOf(context).bottom + 120;
+    final bottom = MediaQuery.paddingOf(context).bottom + 24;
 
     return SafeArea(
       bottom: false,
@@ -114,11 +107,13 @@ class _HistoryCard extends StatelessWidget {
     final (statusText, statusColor, statusBackground) = item.isCancelled
         ? ('Dibatalkan', AppColors.textSecondary, AppColors.offlineLight)
         : item.isCompleted
-        ? ('Selesai', AppColors.success, AppColors.successSurface)
-        : ('Berjalan', AppColors.ambulance, AppColors.ambulanceSurface);
-    final details = item.isCancelled
-        ? (item.cancelReason ?? '')
-        : [?item.hospitalName, ?item.plateNumber, ?item.driverName].join(' · ');
+        ? ('Selesai', AppColors.online, AppColors.onlineLight)
+        : ('Berjalan', AppColors.emergency, AppColors.emergencyLight);
+    final details = [
+      ?item.hospitalName,
+      ?item.plateNumber,
+      ?item.driverName,
+    ].join(' · ');
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -195,10 +190,8 @@ class _HistoryCard extends StatelessWidget {
             const SizedBox(height: 4),
             Row(
               children: [
-                Icon(
-                  item.isCancelled
-                      ? Icons.cancel_outlined
-                      : Icons.local_hospital_outlined,
+                const Icon(
+                  Icons.local_hospital_outlined,
                   size: 16,
                   color: AppColors.textSecondary,
                 ),
@@ -235,7 +228,7 @@ class _Empty extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 48),
       child: Column(
         children: [
-          Icon(icon, size: 48, color: AppColors.textHint),
+          Icon(icon, size: 48, color: AppColors.textMuted),
           const SizedBox(height: 12),
           Text(
             text,

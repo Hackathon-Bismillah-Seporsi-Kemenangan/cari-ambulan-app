@@ -2,24 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
-import '../../data/medical_repository.dart';
-import '../../domain/medical_profile.dart';
-import '../providers/medical_profile_provider.dart';
+import '../../domain/user_models.dart';
+import '../providers/user_home_providers.dart';
+import '../widgets/sync_notice.dart';
 import 'medical_id_form_page.dart';
 
 /// "Medical ID": what paramedics see about the patient during an emergency.
 class MedicalIdPage extends ConsumerWidget {
-  const MedicalIdPage({super.key, this.inTab = false});
-
-  /// Shown as a tab of the patient shell: no back button, and room for the
-  /// floating tab bar.
-  final bool inTab;
-
-  static Future<void> open(BuildContext context) => Navigator.of(
-    context,
-  ).push(MaterialPageRoute<void>(builder: (_) => const MedicalIdPage()));
+  const MedicalIdPage({super.key});
 
   static Future<void> edit(BuildContext context, MedicalProfile profile) =>
       Navigator.of(context).push(
@@ -31,91 +23,51 @@ class MedicalIdPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final medical = ref.watch(medicalProfileProvider);
-    final name = ref.watch(authProvider).valueOrNull?.fullName ?? '';
+    final name = ref.watch(authProvider).value?.fullName ?? '';
 
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: inTab
-          ? null
-          : AppBar(
-              backgroundColor: AppColors.surface,
-              foregroundColor: AppColors.textPrimary,
-              elevation: 0,
+    return SafeArea(
+      bottom: false,
+      child: switch (medical) {
+        AsyncData(:final value) => RefreshIndicator(
+          onRefresh: () => ref.refresh(medicalProfileProvider.future),
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              16,
+              16,
+              MediaQuery.paddingOf(context).bottom + 24,
             ),
-      body: SafeArea(
-        bottom: false,
-        child: switch (medical) {
-          AsyncData(:final value) => RefreshIndicator(
-            onRefresh: () => ref.refresh(medicalProfileProvider.future),
-            child: ListView(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                16,
-                16,
-                MediaQuery.paddingOf(context).bottom + (inTab ? 120 : 24),
-              ),
-              children: [
-                _Header(onEdit: () => edit(context, value)),
-                if (ref.watch(medicalSyncPendingProvider).valueOrNull ??
-                    false) ...[
-                  const SizedBox(height: 12),
-                  const _SyncNotice(),
-                ],
-                const SizedBox(height: 20),
-                _PatientCard(name: name, profile: value),
-                const SizedBox(height: 24),
-                _AllergiesAndConditions(
-                  profile: value,
-                  onAdd: () => edit(context, value),
-                ),
-                const SizedBox(height: 24),
-                _EmergencyContactSection(
-                  contact: value.emergencyContact,
-                  onAdd: () => edit(context, value),
-                ),
-                const SizedBox(height: 20),
-                _ShareOnSosTile(profile: value),
+            children: [
+              _Header(onEdit: () => edit(context, value.value)),
+              if (!value.synced) ...[
+                const SizedBox(height: 12),
+                const SyncNotice(),
               ],
-            ),
+              const SizedBox(height: 20),
+              _PatientCard(name: name, profile: value.value),
+              const SizedBox(height: 24),
+              _AllergiesAndConditions(
+                profile: value.value,
+                onAdd: () => edit(context, value.value),
+              ),
+              const SizedBox(height: 24),
+              _EmergencyContactSection(
+                contact: value.value.emergencyContact,
+                onAdd: () => edit(context, value.value),
+              ),
+              const SizedBox(height: 20),
+              _ShareOnSosTile(profile: value.value),
+            ],
           ),
-          AsyncError() => Center(
-            child: TextButton(
-              onPressed: () => ref.invalidate(medicalProfileProvider),
-              child: const Text('Gagal memuat Medical ID. Coba lagi'),
-            ),
+        ),
+        AsyncError() => Center(
+          child: TextButton(
+            onPressed: () => ref.invalidate(medicalProfileProvider),
+            child: const Text('Gagal memuat Medical ID. Coba lagi'),
           ),
-          _ => const Center(child: CircularProgressIndicator()),
-        },
-      ),
-    );
-  }
-}
-
-/// An edit made offline, still to be sent.
-class _SyncNotice extends StatelessWidget {
-  const _SyncNotice();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.warningSurface,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: const Row(
-        children: [
-          Icon(Icons.cloud_off_outlined, size: 20, color: AppColors.warning),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Perubahan tersimpan di HP ini dan belum tersinkron ke server. '
-              'Tarik ke bawah untuk mencoba lagi.',
-              style: TextStyle(fontSize: 13, color: AppColors.textPrimary),
-            ),
-          ),
-        ],
-      ),
+        ),
+        _ => const Center(child: CircularProgressIndicator()),
+      },
     );
   }
 }
@@ -172,7 +124,7 @@ class _PatientCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.ambulance,
+        color: AppColors.emergency,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
@@ -216,7 +168,7 @@ class _PatientCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 21,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.ambulance,
+                    color: AppColors.emergency,
                   ),
                 ),
               ),
@@ -467,21 +419,10 @@ class _ShareOnSosTileState extends ConsumerState<_ShareOnSosTile> {
 
   Future<void> _toggle(bool value) async {
     setState(() => _saving = true);
-    try {
-      await ref
-          .read(medicalRepositoryProvider)
-          .save(widget.profile.copyWith(shareOnSos: value));
-      ref.invalidate(medicalProfileProvider);
-    } on MedicalSavedOffline {
-      // Kept on the phone; the page says it isn't synced yet.
-      ref.invalidate(medicalProfileProvider);
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gagal menyimpan. Coba lagi.')),
-        );
-      }
-    }
+    await ref
+        .read(userRepositoryProvider)
+        .saveMedicalProfile(widget.profile.copyWith(shareOnSos: value));
+    ref.invalidate(medicalProfileProvider);
     if (mounted) setState(() => _saving = false);
   }
 
@@ -521,7 +462,7 @@ class _ShareOnSosTileState extends ConsumerState<_ShareOnSosTile> {
           Switch(
             value: widget.profile.shareOnSos,
             onChanged: _saving ? null : _toggle,
-            activeTrackColor: AppColors.success,
+            activeTrackColor: AppColors.online,
             activeThumbColor: Colors.white,
           ),
         ],

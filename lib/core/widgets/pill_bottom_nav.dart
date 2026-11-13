@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../constants/app_colors.dart';
+import '../theme/app_colors.dart';
 
 typedef PillNavItem = ({IconData icon, String label});
 
@@ -12,7 +12,7 @@ class PillBottomNav extends StatelessWidget {
     required this.currentIndex,
     required this.onTap,
     this.color = AppColors.primary,
-    this.selectedBackground = AppColors.primarySurface,
+    this.selectedBackground = AppColors.primaryLight,
   });
 
   final List<PillNavItem> items;

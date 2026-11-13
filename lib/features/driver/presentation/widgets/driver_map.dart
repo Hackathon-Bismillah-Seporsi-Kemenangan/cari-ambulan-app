@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../../../../core/constants/app_colors.dart';
 import '../../../../core/map/map_tiles.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../domain/driver_models.dart';
 
 /// Map background for the driver screens.
 ///
@@ -15,37 +16,43 @@ class DriverMap extends StatelessWidget {
     required this.controller,
     required this.location,
     required this.isOnline,
+    this.hospital,
     this.route = const [],
     this.destination,
     this.onMapReady,
-    this.showAttribution = true,
+    this.onRotationChanged,
   });
 
   final MapController controller;
   final LatLng location;
   final bool isOnline;
+  final NearbyHospital? hospital;
 
   /// Driving route to draw, e.g. towards the patient.
   final List<LatLng> route;
 
-  /// Pickup or hospital, shown as a blue location dot.
+  /// Pickup point, shown as a blue location dot.
   final LatLng? destination;
   final VoidCallback? onMapReady;
+  final ValueChanged<double>? onRotationChanged;
 
-  /// Off when the screen shows the attribution itself, e.g. above a sheet.
-  final bool showAttribution;
+  static const attribution = MapTiles.attribution;
 
   @override
   Widget build(BuildContext context) {
     return FlutterMap(
       mapController: controller,
       options: MapOptions(
-        initialCenter: location,
+        initialCenter: MapTiles.clamp(location),
         initialZoom: 15,
-        minZoom: 5,
+        minZoom: MapTiles.minZoom,
+        cameraConstraint: MapTiles.cameraConstraint,
         maxZoom: 19,
         backgroundColor: MapTiles.background,
         onMapReady: onMapReady,
+        onPositionChanged: onRotationChanged == null
+            ? null
+            : (camera, _) => onRotationChanged!(camera.rotation),
         interactionOptions: const InteractionOptions(
           flags: InteractiveFlag.all,
           // Avoid accidental rotation while panning, like Google Maps.
@@ -76,9 +83,16 @@ class DriverMap extends StatelessWidget {
             ],
           ),
         MarkerLayer(
-          // Keep the markers upright when the map is rotated.
+          // Keep chips and the ambulance upright when the map is rotated.
           rotate: true,
           markers: [
+            if (isOnline && hospital != null)
+              Marker(
+                point: hospital!.location,
+                width: 220,
+                height: 44,
+                child: _HospitalChip(hospital: hospital!),
+              ),
             if (destination != null)
               Marker(
                 point: destination!,
@@ -94,10 +108,7 @@ class DriverMap extends StatelessWidget {
             ),
           ],
         ),
-        if (showAttribution)
-          const SimpleAttributionWidget(
-            source: Text(MapTiles.attribution, style: TextStyle(fontSize: 10)),
-          ),
+        MapCoverageNote(location: location),
       ],
     );
   }
@@ -187,7 +198,7 @@ class _AmbulanceMarkerState extends State<_AmbulanceMarker>
           width: 52,
           height: 52,
           decoration: BoxDecoration(
-            color: isOnline ? AppColors.ambulance : AppColors.offline,
+            color: isOnline ? AppColors.emergency : AppColors.offline,
             shape: BoxShape.circle,
             border: Border.all(color: Colors.white, width: 3),
             boxShadow: const [
@@ -209,7 +220,7 @@ class _AmbulanceMarkerState extends State<_AmbulanceMarker>
   }
 }
 
-/// Destination, styled like Google Maps' blue location dot.
+/// Pickup location, styled like Google Maps' blue location dot.
 class _DestinationDot extends StatelessWidget {
   const _DestinationDot();
 
@@ -239,6 +250,63 @@ class _DestinationDot extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HospitalChip extends StatelessWidget {
+  const _HospitalChip({required this.hospital});
+
+  final NearbyHospital hospital;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(4, 4, 14, 4),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(999),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 8,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: const BoxDecoration(
+                color: AppColors.online,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.local_hospital_rounded,
+                color: Colors.white,
+                size: 16,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                '${hospital.name} · ${hospital.distanceKm.toStringAsFixed(1)} km',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

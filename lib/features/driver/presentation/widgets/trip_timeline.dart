@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/app_colors.dart';
 
 enum TimelineStatus { done, active, pending }
 
@@ -79,7 +79,7 @@ class _Row extends StatelessWidget {
                   Expanded(
                     child: Container(
                       width: 2,
-                      color: lineDone ? AppColors.success : AppColors.divider,
+                      color: lineDone ? AppColors.online : AppColors.divider,
                     ),
                   ),
               ],
@@ -98,7 +98,7 @@ class _Row extends StatelessWidget {
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                       color: isPending
-                          ? AppColors.textHint
+                          ? AppColors.textMuted
                           : AppColors.textPrimary,
                     ),
                   ),
@@ -108,7 +108,7 @@ class _Row extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         color: isActive
-                            ? AppColors.ambulance
+                            ? AppColors.emergency
                             : AppColors.textSecondary,
                       ),
                     ),
@@ -134,7 +134,7 @@ class _Dot extends StatelessWidget {
         width: 28,
         height: 28,
         decoration: const BoxDecoration(
-          color: AppColors.success,
+          color: AppColors.online,
           shape: BoxShape.circle,
         ),
         child: const Icon(Icons.check_rounded, color: Colors.white, size: 18),
@@ -143,9 +143,9 @@ class _Dot extends StatelessWidget {
         width: 28,
         height: 28,
         decoration: BoxDecoration(
-          color: AppColors.ambulance,
+          color: AppColors.emergency,
           shape: BoxShape.circle,
-          border: Border.all(color: AppColors.ambulanceSurface, width: 3),
+          border: Border.all(color: AppColors.emergencyLight, width: 3),
         ),
         child: const Icon(
           Icons.navigation_rounded,

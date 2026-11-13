@@ -4,18 +4,22 @@ import 'package:flutter/material.dart';
 
 /// Shrinking ring with the seconds left to accept an emergency call.
 ///
-/// Starts from the server's [remaining] time rather than a full window, so a
-/// call that arrived late shows the real time left. Purely visual: the offer
-/// itself expires in `driverOfferProvider`.
+/// Counts down to [expiresAt] (server time) rather than a local duration, so
+/// a call that arrived late shows the real remaining time.
 class CallCountdown extends StatefulWidget {
   const CallCountdown({
     super.key,
-    required this.remaining,
+    required this.expiresAt,
     required this.total,
+    this.onExpired,
   });
 
-  final Duration remaining;
+  final DateTime expiresAt;
   final Duration total;
+
+  /// Called once when the time runs out. Null while the driver's response is
+  /// being sent, so an expiry can't race an accept.
+  final VoidCallback? onExpired;
 
   @override
   State<CallCountdown> createState() => _CallCountdownState();
@@ -24,18 +28,41 @@ class CallCountdown extends StatefulWidget {
 class _CallCountdownState extends State<CallCountdown>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
+  bool _expired = false;
 
   @override
   void initState() {
     super.initState();
+    final remaining = widget.expiresAt.difference(DateTime.now());
     final totalMs = widget.total.inMilliseconds;
     final startValue = totalMs <= 0
         ? 1.0
-        : (1 - widget.remaining.inMilliseconds / totalMs).clamp(0.0, 1.0);
+        : (1 - remaining.inMilliseconds / totalMs).clamp(0.0, 1.0);
 
     _controller = AnimationController(vsync: this, duration: widget.total)
       ..value = startValue
+      ..addStatusListener((status) {
+        if (status == AnimationStatus.completed) _expire();
+      })
       ..forward();
+    if (startValue >= 1) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _expire());
+    }
+  }
+
+  @override
+  void didUpdateWidget(CallCountdown oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // The callback was re-enabled after the deadline passed (e.g. a failed
+    // accept), so treat the call as expired now.
+    if (oldWidget.onExpired == null && _controller.isCompleted) _expire();
+  }
+
+  void _expire() {
+    final onExpired = widget.onExpired;
+    if (_expired || onExpired == null) return;
+    _expired = true;
+    onExpired();
   }
 
   @override

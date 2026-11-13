@@ -1,163 +1,169 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../domain/driver_models.dart';
 
+/// Top card with the ONLINE/OFFLINE label and the power switch.
 class AvailabilityCard extends StatelessWidget {
   const AvailabilityCard({
     super.key,
     required this.profile,
-    required this.isUpdating,
+    required this.isOnline,
+    required this.isBusy,
     required this.onToggle,
-    this.lastBeaconLat,
-    this.lastBeaconLng,
   });
 
   final DriverProfile profile;
-  final bool isUpdating;
+  final bool isOnline;
+  final bool isBusy;
   final VoidCallback onToggle;
-  final double? lastBeaconLat;
-  final double? lastBeaconLng;
 
   @override
   Widget build(BuildContext context) {
-    final isOnline = profile.isOnline;
-    final statusColor = isOnline ? AppColors.success : AppColors.textSecondary;
-    final lat = lastBeaconLat ?? profile.currentLatitude;
-    final lng = lastBeaconLng ?? profile.currentLongitude;
+    final color = isOnline ? AppColors.online : AppColors.offline;
 
-    return Container(
-      padding: const EdgeInsets.all(18),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: isOnline ? AppColors.success.withValues(alpha: 0.5) : AppColors.divider,
-          width: 1.5,
+          color: isOnline ? AppColors.online : Colors.transparent,
+          width: 2,
         ),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black12,
+            blurRadius: 12,
+            offset: Offset(0, 4),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          // Header: Status indicator + Switch
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: statusColor,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    isOnline ? 'SIAP BERTUGAS (ONLINE)' : 'TIDAK AKTIF (OFFLINE)',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                      color: statusColor,
-                    ),
-                  ),
-                ],
-              ),
-              isUpdating
-                  ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2.5),
-                    )
-                  : Switch.adaptive(
-                      value: isOnline,
-                      onChanged: (_) => onToggle(),
-                      activeTrackColor: AppColors.success,
-                    ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          const Divider(height: 1),
-          const SizedBox(height: 14),
-
-          // Vehicle & Hospital Info
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: isOnline ? Colors.green.shade50 : Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  Icons.airport_shuttle_rounded,
-                  color: isOnline ? AppColors.success : AppColors.textSecondary,
-                  size: 28,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
                   children: [
-                    Text(
-                      '${profile.vehiclePlate} · ${profile.vehicleType}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                        color: AppColors.textPrimary,
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(width: 8),
                     Text(
-                      profile.hospitalName ?? 'Belum Ditugaskan',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
+                      isOnline ? 'ONLINE' : 'OFFLINE',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                        color: color,
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 4),
+                Text(
+                  isOnline
+                      ? '${profile.vehiclePlate} · ${profile.vehicleType}'
+                      : 'Aktifkan saat siap bertugas',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: isOnline
+                        ? AppColors.textSecondary
+                        : AppColors.textPrimary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
+          const SizedBox(width: 12),
+          PowerSwitch(value: isOnline, isBusy: isBusy, onTap: onToggle),
+        ],
+      ),
+    );
+  }
+}
 
-          // Live GPS Beacon Info
-          if (isOnline && lat != null && lng != null) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.my_location, size: 14, color: AppColors.success),
-                  const SizedBox(width: 6),
-                  Text(
-                    'GPS Aktif: ${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)} (Update otomatis)',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.success,
-                    ),
+/// Pill switch whose thumb carries a power icon, matching the design.
+class PowerSwitch extends StatelessWidget {
+  const PowerSwitch({
+    super.key,
+    required this.value,
+    required this.isBusy,
+    required this.onTap,
+  });
+
+  final bool value;
+  final bool isBusy;
+  final VoidCallback onTap;
+
+  static const _width = 84.0;
+  static const _height = 48.0;
+  static const _thumb = 40.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final trackColor = value ? AppColors.online : AppColors.offlineLight;
+
+    return Semantics(
+      toggled: value,
+      button: true,
+      label: value
+          ? 'Online, ketuk untuk offline'
+          : 'Offline, ketuk untuk online',
+      child: GestureDetector(
+        onTap: isBusy ? null : onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          width: _width,
+          height: _height,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: trackColor,
+            borderRadius: BorderRadius.circular(_height / 2),
+          ),
+          child: AnimatedAlign(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic,
+            alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+            child: Container(
+              width: _thumb,
+              height: _thumb,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black12,
+                    blurRadius: 4,
+                    offset: Offset(0, 2),
                   ),
                 ],
               ),
+              child: isBusy
+                  ? Padding(
+                      padding: const EdgeInsets.all(11),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: value ? AppColors.online : AppColors.offline,
+                      ),
+                    )
+                  : Icon(
+                      Icons.power_settings_new_rounded,
+                      size: 20,
+                      color: value ? AppColors.online : AppColors.offline,
+                    ),
             ),
-          ],
-        ],
+          ),
+        ),
       ),
     );
   }

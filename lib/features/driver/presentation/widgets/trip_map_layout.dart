@@ -3,9 +3,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../../core/map/route_trim.dart';
-import '../../../../core/constants/app_colors.dart';
-import '../../../../core/map/map_tiles.dart';
-import '../../../call/presentation/widgets/active_call_screen.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../domain/driver_models.dart';
 import '../../domain/route_models.dart';
 import 'driver_map.dart';
 
@@ -19,6 +18,8 @@ class TripMapLayout extends StatefulWidget {
     required this.route,
     required this.top,
     required this.sheet,
+    this.showTargetDot = false,
+    this.hospital,
   });
 
   final LatLng location;
@@ -30,6 +31,12 @@ class TripMapLayout extends StatefulWidget {
   final DriveRoute? route;
   final Widget top;
   final Widget sheet;
+
+  /// Draws [target] as a blue location dot (the patient).
+  final bool showTargetDot;
+
+  /// Shown as a labelled chip (the destination hospital).
+  final NearbyHospital? hospital;
 
   @override
   State<TripMapLayout> createState() => _TripMapLayoutState();
@@ -91,14 +98,14 @@ class _TripMapLayoutState extends State<TripMapLayout> {
             controller: _mapController,
             location: widget.location,
             isOnline: true,
+            hospital: widget.hospital,
             // Starts at the ambulance, not where the route was fetched.
             route: routeAhead(
               widget.route?.points ?? const [],
               widget.location,
             ),
-            destination: widget.target,
+            destination: widget.showTargetDot ? widget.target : null,
             onMapReady: _fitAfterLayout,
-            showAttribution: false,
           ),
         ),
         Positioned(
@@ -126,7 +133,7 @@ class _TripMapLayoutState extends State<TripMapLayout> {
                   children: [
                     const Expanded(
                       child: Text(
-                        MapTiles.attribution,
+                        DriverMap.attribution,
                         style: TextStyle(
                           fontSize: 10,
                           color: AppColors.textSecondary,
@@ -201,8 +208,6 @@ class TripSheet extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 14),
-              // A call with the patient, over the trip's own buttons.
-              const ActiveCallBar(),
               ...children,
             ],
           ),

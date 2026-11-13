@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../constants/app_colors.dart';
+import '../theme/app_colors.dart';
 
 /// Rounded group of [SettingsTile]s separated by dividers.
 class SettingsGroup extends StatelessWidget {

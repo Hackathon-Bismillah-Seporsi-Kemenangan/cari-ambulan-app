@@ -11,4 +11,3 @@ enum UserRole {
   /// The API calls the patient/caller role `user`.
   String get apiValue => isPatient ? 'user' : 'driver';
 }
-

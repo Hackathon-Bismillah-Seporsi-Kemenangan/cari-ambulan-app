@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
-import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../domain/driver_models.dart';
 import '../providers/driver_home_provider.dart';
 
@@ -10,6 +10,9 @@ import '../providers/driver_home_provider.dart';
 final driverTripHistoryProvider =
     FutureProvider.autoDispose<List<DriverTripHistoryItem>>(
       (ref) => ref.watch(driverRepositoryProvider).fetchTripHistory(),
+      // Show the error instead of a spinner while Riverpod retries: pull to
+      // refresh and reopening the tab load it again.
+      retry: (count, error) => null,
     );
 
 /// "Riwayat": orders the driver completed or that were cancelled.
@@ -103,8 +106,8 @@ class _Summary extends StatelessWidget {
           child: _Count(
             value: completed,
             label: 'Selesai',
-            color: AppColors.success,
-            background: AppColors.successSurface,
+            color: AppColors.online,
+            background: AppColors.onlineLight,
           ),
         ),
         const SizedBox(width: 12),
@@ -199,7 +202,7 @@ class _TripCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final (statusText, statusColor, statusBackground) = item.isCancelled
         ? ('Dibatalkan', AppColors.textSecondary, AppColors.offlineLight)
-        : ('Selesai', AppColors.success, AppColors.successSurface);
+        : ('Selesai', AppColors.online, AppColors.onlineLight);
     final endedAt = item.completedAt ?? item.cancelledAt;
     final outcome = item.isCancelled
         ? [
@@ -323,7 +326,7 @@ class _Empty extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 48),
       child: Column(
         children: [
-          Icon(icon, size: 48, color: AppColors.textHint),
+          Icon(icon, size: 48, color: AppColors.textMuted),
           const SizedBox(height: 12),
           Text(
             text,

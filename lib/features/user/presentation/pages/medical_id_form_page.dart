@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/constants/app_colors.dart';
-import '../../../../core/network/api_client.dart';
-import '../../data/medical_repository.dart';
-import '../../domain/medical_profile.dart';
-import '../providers/medical_profile_provider.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../domain/user_models.dart';
+import '../providers/user_home_providers.dart';
 
 /// Edits the Medical ID: blood type, body, allergies, conditions, the
 /// emergency contact and insurance.
@@ -106,38 +104,21 @@ class _MedicalIdFormPageState extends ConsumerState<MedicalIdFormPage> {
     );
 
     setState(() => _saving = true);
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      await ref.read(medicalRepositoryProvider).save(profile);
-      ref.invalidate(medicalProfileProvider);
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Medical ID tersimpan.')),
-      );
-      if (mounted) Navigator.of(context).pop();
-    } on MedicalSavedOffline {
-      ref.invalidate(medicalProfileProvider);
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Tersimpan di HP ini. Dikirim ke server saat kembali online.',
-          ),
+    final synced = await ref
+        .read(userRepositoryProvider)
+        .saveMedicalProfile(profile);
+    ref.invalidate(medicalProfileProvider);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          synced
+              ? 'Medical ID tersimpan.'
+              : 'Medical ID tersimpan di HP ini. Belum tersinkron ke server.',
         ),
-      );
-      if (mounted) Navigator.of(context).pop();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _saving = false);
-      // Stay on the form so nothing typed is lost.
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            e is ApiException
-                ? e.message
-                : 'Gagal menyimpan Medical ID. Coba lagi.',
-          ),
-        ),
-      );
-    }
+      ),
+    );
+    Navigator.of(context).pop();
   }
 
   @override
@@ -160,7 +141,7 @@ class _MedicalIdFormPageState extends ConsumerState<MedicalIdFormPage> {
                     label: Text(type ?? 'Tidak tahu'),
                     selected: _bloodType == type,
                     onSelected: (_) => setState(() => _bloodType = type),
-                    selectedColor: AppColors.ambulanceSurface,
+                    selectedColor: AppColors.emergencyLight,
                   ),
               ],
             ),
@@ -252,7 +233,7 @@ class _MedicalIdFormPageState extends ConsumerState<MedicalIdFormPage> {
               child: FilledButton(
                 onPressed: _saving ? null : _save,
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.ambulance,
+                  backgroundColor: AppColors.emergency,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),

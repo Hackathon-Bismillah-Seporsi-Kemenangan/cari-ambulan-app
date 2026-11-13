@@ -1,26 +1,18 @@
+import '../../../../core/network/api_client.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:latlong2/latlong.dart';
 
-import '../../../../core/constants/app_colors.dart';
-import '../../../emergency/domain/emergency_models.dart';
-import '../../data/routing_repository.dart';
-import '../providers/driver_trip_provider.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../domain/driver_models.dart';
+import '../providers/driver_home_provider.dart';
+import '../widgets/trip_call_widgets.dart';
 import '../widgets/trip_map_layout.dart';
 import '../widgets/trip_timeline.dart';
 
 /// "Menuju rumah sakit": patient on board, driving to the assigned IGD.
 class ToHospitalPage extends ConsumerStatefulWidget {
-  const ToHospitalPage({
-    super.key,
-    required this.trip,
-    required this.hospital,
-    required this.location,
-  });
-
-  final EmergencyRequestModel trip;
-  final HospitalInfo hospital;
-  final LatLng location;
+  const ToHospitalPage({super.key});
 
   @override
   ConsumerState<ToHospitalPage> createState() => _ToHospitalPageState();
@@ -28,14 +20,20 @@ class ToHospitalPage extends ConsumerStatefulWidget {
 
 class _ToHospitalPageState extends ConsumerState<ToHospitalPage>
     with StableRouteOrigin {
-  Future<void> _handover() async {
+  bool _isCompleting = false;
+
+  /// Last trip shown, kept so the page doesn't go blank while it closes
+  /// after handover clears the trip.
+  ActiveTrip? _trip;
+
+  Future<void> _handover(HospitalAssignment assignment) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Serahkan pasien?'),
         content: Text(
           'Pastikan pasien sudah diterima tim IGD '
-          '${widget.hospital.name}. Order akan ditutup.',
+          '${assignment.hospital.name}. Order akan ditutup.',
         ),
         actions: [
           TextButton(
@@ -50,95 +48,147 @@ class _ToHospitalPageState extends ConsumerState<ToHospitalPage>
       ),
     );
     if (confirmed != true || !mounted) return;
-    await ref.read(driverTripProvider.notifier).advanceStage();
+
+    setState(() => _isCompleting = true);
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    try {
+      await ref.read(driverHomeProvider.notifier).completeHandover();
+      navigator.pop();
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Order selesai. Anda kembali online. Terima kasih!'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isCompleting = false);
+      if (e is ApiException && e.isConflict) {
+        ref.read(driverHomeProvider.notifier).syncTrip();
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            e is ApiException ? e.message : 'Gagal menutup order. Coba lagi.',
+          ),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final trip = widget.trip;
-    final hospital = widget.hospital;
-    final isUpdating = ref.watch(
-      driverTripProvider.select((state) => state.isUpdating),
-    );
-    final target = LatLng(hospital.latitude, hospital.longitude);
+    final state = ref.watch(driverHomeProvider).value;
+    final trip = _trip = state?.trip ?? _trip;
+    final assignment = trip?.hospital;
+    if (state == null || trip == null || assignment == null) {
+      return const Scaffold();
+    }
+
+    final hospital = assignment.hospital;
     final route = ref
         .watch(
-          routeProvider((from: routeOrigin(widget.location), to: target)),
+          routeProvider((
+            from: routeOrigin(state.location),
+            to: hospital.location,
+          )),
         )
         .value;
-    final eta =
-        route == null ? null : formatClock(DateTime.now().add(route.duration));
+    final eta = route == null
+        ? null
+        : formatClock(DateTime.now().add(route.duration));
 
-    return TripMapLayout(
-      location: widget.location,
-      target: target,
-      route: route,
-      top: _HospitalNotice(
-        hospital: hospital,
-        preparation: trip.hospitalPreparation,
-      ),
-      sheet: TripSheet(
-        children: [
-          const Text(
-            'Menuju rumah sakit',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '${hospital.name} · '
-            '${eta == null ? 'Menghitung rute…' : 'ETA $eta'}',
-            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 16),
-          TripTimeline(entries: _timeline(trip, eta)),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: isUpdating ? null : _handover,
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(56),
-              backgroundColor: AppColors.primary,
-              disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.6),
-              disabledForegroundColor: Colors.white,
-            ),
-            icon: isUpdating
-                ? const SizedBox.square(
-                    dimension: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: Colors.white,
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        // The patient is on board; the reporter may still call for updates.
+        body: TripCallOverlay(
+          child: TripMapLayout(
+            location: state.location,
+            target: hospital.location,
+            route: route,
+            hospital: route == null
+                ? hospital
+                : NearbyHospital(
+                    name: hospital.name,
+                    location: hospital.location,
+                    distanceKm: route.distanceMeters / 1000,
+                  ),
+            top: _HospitalNotice(assignment: assignment),
+            sheet: TripSheet(
+              children: [
+                const ActiveCallBar(),
+                Text(
+                  'Menuju rumah sakit',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Pasien di dalam ambulans · '
+                  '${eta == null ? 'Menghitung rute…' : 'ETA $eta'}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 16),
+                TripTimeline(entries: _timeline(trip, eta)),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: _isCompleting ? null : () => _handover(assignment),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(56),
+                    disabledBackgroundColor: AppColors.primary.withValues(
+                      alpha: 0.6,
                     ),
-                  )
-                : const Icon(Icons.local_hospital_outlined),
-            label: const Text('Serahkan Pasien ke IGD'),
+                    disabledForegroundColor: Colors.white,
+                  ),
+                  icon: _isCompleting
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.local_hospital_outlined),
+                  label: const Text('Serahkan Pasien ke IGD'),
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  List<TimelineEntry> _timeline(EmergencyRequestModel trip, String? eta) {
+  List<TimelineEntry> _timeline(ActiveTrip trip, String? eta) {
     String? at(DateTime? time) => time == null ? null : formatClock(time);
     const done = TimelineStatus.done;
 
     return [
       TimelineEntry(
-        label: 'Panggilan diterima',
+        label: 'Mencari ambulans',
+        status: done,
+        caption: at(trip.request.requestedAt ?? trip.request.offeredAt),
+      ),
+      TimelineEntry(
+        label: 'Pesanan diterima',
+        status: done,
+        caption: at(trip.acceptedAt),
+      ),
+      // The driver sets off as soon as the order is accepted.
+      TimelineEntry(
+        label: 'Dalam perjalanan',
         status: done,
         caption: at(trip.acceptedAt),
       ),
       TimelineEntry(
         label: 'Tiba di lokasi',
         status: done,
-        caption: at(trip.arrivedAtPickupAt),
+        caption: at(trip.arrivedAt),
       ),
       TimelineEntry(
         label: 'Menuju rumah sakit',
         status: TimelineStatus.active,
-        caption: eta == null ? at(trip.pickedUpAt) : 'ETA $eta',
+        caption: eta == null ? null : 'ETA $eta',
       ),
       const TimelineEntry(label: 'Selesai', status: TimelineStatus.pending),
     ];
@@ -147,23 +197,18 @@ class _ToHospitalPageState extends ConsumerState<ToHospitalPage>
 
 /// Yellow card confirming the hospital's IGD was alerted.
 class _HospitalNotice extends StatelessWidget {
-  const _HospitalNotice({required this.hospital, this.preparation});
+  const _HospitalNotice({required this.assignment});
 
-  final HospitalInfo hospital;
-  final String? preparation;
+  final HospitalAssignment assignment;
 
   @override
   Widget build(BuildContext context) {
-    final entrance = hospital.ambulanceEntrance;
-    final details = [
-      if (preparation != null && preparation!.isNotEmpty) preparation!,
-      if (entrance != null) 'Pintu masuk ambulans: $entrance.',
-    ].join(' ');
+    final entrance = assignment.entrance;
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.warningSurface,
+        color: AppColors.warningLight,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
         boxShadow: const [
@@ -188,24 +233,25 @@ class _HospitalNotice extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${hospital.name} sudah diberi tahu',
+                  '${assignment.hospital.name} sudah diberi tahu',
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
                   ),
                 ),
-                if (details.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    details,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      height: 1.4,
-                      color: AppColors.textPrimary,
-                    ),
+                const SizedBox(height: 2),
+                Text(
+                  [
+                    assignment.preparation,
+                    if (entrance != null) 'Pintu masuk ambulans: $entrance.',
+                  ].join(' '),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    height: 1.4,
+                    color: AppColors.textPrimary,
                   ),
-                ],
+                ),
               ],
             ),
           ),
