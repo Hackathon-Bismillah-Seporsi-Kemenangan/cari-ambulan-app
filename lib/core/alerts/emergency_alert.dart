@@ -4,6 +4,7 @@ import 'package:vibration/vibration.dart';
 
 import '../logging/app_log.dart';
 import '../permissions/permission_requests.dart';
+import 'lock_screen.dart';
 
 /// Rings the driver for a new emergency order: looping siren, urgent
 /// vibration and a heads-up notification, until [stop].
@@ -22,6 +23,8 @@ abstract final class EmergencyAlert {
 
   static const _notificationId = 1001;
 
+  static const _lockReason = 'alert';
+
   /// Ringtone and vibration are played by [start], so the channel is silent.
   static const _channel = AndroidNotificationDetails(
     'emergency_calls',
@@ -35,6 +38,8 @@ abstract final class EmergencyAlert {
     enableVibration: false,
     ongoing: true,
     autoCancel: true,
+    // Opens the order over the lock screen (MainActivity.kt).
+    fullScreenIntent: true,
     color: Color(0xFFD32F2F),
     ticker: 'Panggilan darurat',
   );
@@ -52,6 +57,7 @@ abstract final class EmergencyAlert {
     autoCancel: true,
     // Calls ring out and offers expire after about 30 s.
     timeoutAfter: 45000,
+    fullScreenIntent: true,
     color: Color(0xFFD32F2F),
   );
 
@@ -91,7 +97,8 @@ abstract final class EmergencyAlert {
     required String body,
   }) async {
     _active = true;
-    final (_, _, vibrating) = await (
+    final (_, _, _, vibrating) = await (
+      LockScreen.hold(_lockReason),
       _guard(() => _ringtone.invokeMethod<void>('play')),
       _guard(() async {
         await init();
@@ -139,6 +146,7 @@ abstract final class EmergencyAlert {
   static Future<void> stop() async {
     _active = false;
     await Future.wait([
+      LockScreen.release(_lockReason),
       _guard(() => _ringtone.invokeMethod<void>('stop')),
       _guard(Vibration.cancel),
       _guard(() => _notifications.cancel(id: _notificationId)),

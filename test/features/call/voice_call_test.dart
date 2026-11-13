@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:cari_ambulan_app/core/alerts/lock_screen.dart';
 import 'package:cari_ambulan_app/core/network/api_client.dart';
 import 'package:cari_ambulan_app/features/call/data/call_repository.dart';
 import 'package:cari_ambulan_app/features/call/data/voice_room.dart';
@@ -170,10 +171,14 @@ void main() {
     expect(call().status, VoiceCallStatus.incoming);
     expect(call().peerName, 'Siti');
     expect(call().peerRole, 'Pasien / Keluarga');
+    // Rings over the lock screen, like a phone call.
+    expect(LockScreen.reasons, containsAll(['alert', 'call']));
 
     await notifier().accept();
     expect(call().status, VoiceCallStatus.connected);
     expect(repo.calls, containsAllInOrder(['answer c-9', 'token c-9']));
+    // Answered: the ringing stops, the call stays over the lock screen.
+    expect(LockScreen.reasons, {'call'});
 
     // The same call, still reported ringing by a late poll, doesn't ring
     // again once hung up.
@@ -181,6 +186,7 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     await tester.pump(VoiceCallNotifier.pollEvery);
     expect(call().status, VoiceCallStatus.idle);
+    expect(LockScreen.reasons, isEmpty);
 
     notifier().watchIncoming(false);
   });

@@ -5,6 +5,9 @@
     <!-- Incoming emergency call: vibration and heads-up notification. -->
     <uses-permission android:name="android.permission.VIBRATE"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- A ringing order or call opens over the lock screen, like a phone call. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <!-- Voice calls between patient and driver (LiveKit / WebRTC). -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>

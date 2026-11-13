@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/alerts/emergency_alert.dart';
+import '../../../../core/alerts/lock_screen.dart';
 import '../../../../core/logging/app_log.dart';
 import '../../../../core/network/api_client.dart';
 import '../../data/call_repository.dart';
@@ -17,6 +18,8 @@ final voiceCallProvider = NotifierProvider<VoiceCallNotifier, VoiceCallState>(
 class VoiceCallNotifier extends Notifier<VoiceCallState> {
   /// How often the server is asked for a ringing call and the call's status.
   static const pollEvery = Duration(seconds: 3);
+
+  static const _lockReason = 'call';
 
   Timer? _incomingPoll;
   bool _checkingIncoming = false;
@@ -41,6 +44,17 @@ class VoiceCallNotifier extends Notifier<VoiceCallState> {
       _disposed = true;
       _incomingPoll?.cancel();
       _cleanup();
+      LockScreen.release(_lockReason);
+    });
+    // A call stays over the lock screen while it rings and while talking,
+    // like a phone call.
+    listenSelf((_, next) {
+      switch (next.status) {
+        case VoiceCallStatus.idle || VoiceCallStatus.ended:
+          LockScreen.release(_lockReason);
+        default:
+          LockScreen.hold(_lockReason);
+      }
     });
     return const VoiceCallState.idle();
   }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/alerts/lock_screen.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/settings_list.dart';
@@ -14,6 +15,11 @@ import '../providers/driver_trip_provider.dart';
 
 /// Whether location is allowed "Selalu", so dispatch keeps seeing the
 /// ambulance while the screen is locked.
+/// Whether a new order may ring over the lock screen.
+final _ringOverLockProvider = FutureProvider.autoDispose<bool?>(
+  (ref) => LockScreen.canRing(),
+);
+
 final _locationAlwaysProvider = FutureProvider.autoDispose<bool>((ref) async {
   try {
     return await Geolocator.checkPermission() == LocationPermission.always;
@@ -138,6 +144,21 @@ class DriverProfilePage extends ConsumerWidget {
                     label: 'Notifikasi & suara panggilan',
                     onTap: Geolocator.openAppSettings,
                   ),
+                  if (ref.watch(_ringOverLockProvider).valueOrNull
+                      case final canRing?)
+                    SettingsTile(
+                      icon: Icons.screen_lock_portrait_outlined,
+                      label: 'Tampil di layar kunci',
+                      subtitle: 'Order masuk tetap terlihat saat HP terkunci',
+                      value: canRing ? 'Aktif' : 'Nonaktif',
+                      color: canRing
+                          ? AppColors.textPrimary
+                          : AppColors.ambulance,
+                      onTap: () async {
+                        await LockScreen.allowRinging();
+                        ref.invalidate(_ringOverLockProvider);
+                      },
+                    ),
                   SettingsTile(
                     icon: Icons.my_location_rounded,
                     label: 'Izin lokasi',
