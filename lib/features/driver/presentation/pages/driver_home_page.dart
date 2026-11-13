@@ -154,8 +154,20 @@ class DriverHomePage extends ConsumerWidget {
                     },
                   ),
 
+                  if (profile.isOnline && state.gpsMissing) ...[
+                    const SizedBox(height: 12),
+                    const _NoGpsNotice(
+                      text:
+                          'GPS tidak terbaca. Posisi Anda tidak diperbarui, '
+                          'jadi order di dekat Anda mungkin tidak masuk.',
+                    ),
+                  ],
+
                   // Error notification if toggle fails
-                  if (state.error != null) ...[
+                  if (state.error == noGpsToGoOnline) ...[
+                    const SizedBox(height: 12),
+                    const _NoGpsNotice(text: noGpsToGoOnline),
+                  ] else if (state.error != null) ...[
                     const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.all(12),
@@ -238,6 +250,55 @@ class DriverHomePage extends ConsumerWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// No GPS fix: dispatch can't place this ambulance, so say so and offer the
+/// location settings.
+class _NoGpsNotice extends ConsumerWidget {
+  const _NoGpsNotice({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 8, 8),
+      decoration: BoxDecoration(
+        color: AppColors.warningSurface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.location_off_outlined,
+                color: AppColors.warning,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  text,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          TextButton(
+            onPressed: () => ref.read(locationServiceProvider).openSettings(),
+            child: const Text('Aktifkan lokasi'),
+          ),
+        ],
       ),
     );
   }

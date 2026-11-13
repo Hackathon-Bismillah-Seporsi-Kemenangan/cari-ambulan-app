@@ -1,3 +1,4 @@
+import 'package:cari_ambulan_app/core/location/location_service.dart';
 import 'package:cari_ambulan_app/features/driver/data/driver_repository.dart';
 import 'package:cari_ambulan_app/features/driver/domain/dispatch_offer_model.dart';
 import 'package:cari_ambulan_app/features/driver/domain/driver_models.dart';
@@ -71,6 +72,16 @@ class _MockDriverRepository implements DriverRepository {
   @override
   Future<EmergencyRequestModel> completeTrip(String requestId) async =>
       throw UnimplementedError();
+}
+
+/// GPS at [fix], or off when null.
+class _FakeLocation extends LocationService {
+  _FakeLocation([this.fix = (latitude: -6.19, longitude: 106.82)]);
+
+  final ({double latitude, double longitude})? fix;
+
+  @override
+  Future<({double latitude, double longitude})?> emergencyFix() async => fix;
 }
 
 void main() {
@@ -170,7 +181,10 @@ void main() {
 
       final mockRepo = _MockDriverRepository(initialProfile);
       final container = ProviderContainer(
-        overrides: [driverRepositoryProvider.overrideWithValue(mockRepo)],
+        overrides: [
+          driverRepositoryProvider.overrideWithValue(mockRepo),
+          locationServiceProvider.overrideWithValue(_FakeLocation()),
+        ],
       );
 
       addTearDown(container.dispose);
@@ -183,6 +197,34 @@ void main() {
       await container.read(driverHomeProvider.notifier).toggleAvailability();
       final updatedState = container.read(driverHomeProvider).value!;
       expect(updatedState.profile.isOnline, isTrue);
+      expect(mockRepo._profile.currentLatitude, -6.19);
+    });
+
+    test('without GPS the driver stays offline', () async {
+      final mockRepo = _MockDriverRepository(
+        const DriverProfile(
+          id: 'drv-1',
+          name: 'Budi Santoso',
+          vehiclePlate: 'B 1199 SGM',
+          vehicleType: 'Ambulans ALS',
+          availabilityStatus: DriverAvailability.offline,
+        ),
+      );
+      final container = ProviderContainer(
+        overrides: [
+          driverRepositoryProvider.overrideWithValue(mockRepo),
+          locationServiceProvider.overrideWithValue(_FakeLocation(null)),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(driverHomeProvider.future);
+
+      await container.read(driverHomeProvider.notifier).toggleAvailability();
+
+      final state = container.read(driverHomeProvider).value!;
+      expect(state.profile.isOffline, isTrue);
+      expect(state.error, noGpsToGoOnline);
+      expect(mockRepo._profile.isOffline, isTrue);
     });
   });
 }

@@ -18,7 +18,7 @@ final liveLocationProvider = StreamProvider.autoDispose<LatLng>((ref) {
 });
 
 class LocationService {
-  // Default fallback (Jakarta Pusat / Monas area)
+  /// Where maps open without a fix (Monas, Jakarta). Never sent as a position.
   static const defaultLatitude = -6.2088;
   static const defaultLongitude = 106.8222;
 
@@ -73,14 +73,6 @@ class LocationService {
         distanceFilter: 5,
       ),
     ).map((pos) => LatLng(pos.latitude, pos.longitude));
-  }
-
-  Future<({double latitude, double longitude})> getCoordinates() async {
-    final pos = await getCurrentPosition();
-    if (pos != null) {
-      return (latitude: pos.latitude, longitude: pos.longitude);
-    }
-    return (latitude: defaultLatitude, longitude: defaultLongitude);
   }
 
   /// A real position to send an ambulance to: a fresh fix, else the last
