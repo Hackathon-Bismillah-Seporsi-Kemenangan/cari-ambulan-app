@@ -4,12 +4,11 @@ import 'dart:ui' show lerpDouble;
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/widgets/brand_mark.dart';
+import '../widgets/onboarding_illustrations.dart';
 
 // Warna lokal agar tampilan sesuai desain.
 const _kBlue = Color(0xFF1565C0);
-const _kRed = Color(0xFFE53935);
-const _kGreen = Color(0xFF2E9E57);
-const _kInk = Color(0xFF1B2A4A);
 const _kDotIdle = Color(0xFFE5E7EB);
 const _kCircle = Color(0xFFE6F1FC);
 
@@ -48,12 +47,12 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
     _SlideData(
       title: AppStrings.driverOnboard1Title,
       body: AppStrings.driverOnboard1Desc,
-      illustration: const _DriverIllustration1(),
+      illustration: const OrderAlertIllustration(),
     ),
     _SlideData(
       title: AppStrings.driverOnboard2Title,
       body: AppStrings.driverOnboard2Desc,
-      illustration: const _DriverIllustration2(),
+      illustration: const HospitalRouteIllustration(),
     ),
   ];
 
@@ -138,19 +137,7 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
                 padding: const EdgeInsets.fromLTRB(24, 16, 12, 0),
                 child: Row(
                   children: [
-                    Container(
-                      width: 26,
-                      height: 26,
-                      decoration: BoxDecoration(
-                        color: _kBlue,
-                        borderRadius: BorderRadius.circular(7),
-                      ),
-                      child: const Icon(
-                        Icons.add_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
+                    const BrandMark(size: 26, color: _kBlue),
                     const SizedBox(width: 8),
                     const Expanded(
                       child: Text(
@@ -427,344 +414,6 @@ class _NextButton extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Illustrations (ukuran desain 300x300)
-// Ganti dengan SVG/Lottie/PNG asli kalau sudah ada aset dari desainer.
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Slide 1 — HP di dudukan dengan notifikasi order darurat
-class _DriverIllustration1 extends StatelessWidget {
-  const _DriverIllustration1();
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        // dudukan / base
-        Positioned(
-          bottom: 52,
-          child: Container(
-            width: 210,
-            height: 46,
-            decoration: BoxDecoration(
-              color: _kInk,
-              borderRadius: BorderRadius.circular(22),
-            ),
-            alignment: Alignment.center,
-            child: Container(
-              width: 120,
-              height: 8,
-              decoration: BoxDecoration(
-                color: Colors.white.withAlpha(30),
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-          ),
-        ),
-        // lengan dudukan
-        for (final x in [86.0, 196.0])
-          Positioned(
-            left: x,
-            top: 104,
-            child: Container(
-              width: 18,
-              height: 96,
-              decoration: BoxDecoration(
-                color: const Color(0xFF2B3C60),
-                borderRadius: BorderRadius.circular(9),
-              ),
-            ),
-          ),
-        // HP
-        Positioned(
-          top: 52,
-          child: Container(
-            width: 116,
-            height: 196,
-            decoration: BoxDecoration(
-              color: _kInk,
-              borderRadius: BorderRadius.circular(22),
-            ),
-            padding: const EdgeInsets.all(5),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(17),
-              child: Container(
-                color: const Color(0xFFE3F0FC),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    for (final s in [92.0, 70.0])
-                      Container(
-                        width: s,
-                        height: s,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: _kRed.withAlpha(s > 80 ? 18 : 34),
-                        ),
-                      ),
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: _kRed,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 3),
-                      ),
-                      child: const Icon(
-                        Icons.add_rounded,
-                        color: Colors.white,
-                        size: 32,
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 18,
-                      child: Container(
-                        width: 30,
-                        height: 30,
-                        decoration: const BoxDecoration(
-                          color: _kGreen,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.phone_rounded,
-                          color: Colors.white,
-                          size: 17,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        // bel
-        Positioned(
-          right: 44,
-          top: 54,
-          child: Transform.rotate(
-            angle: 0.2,
-            child: const Icon(
-              Icons.notifications_active_rounded,
-              color: _kBlue,
-              size: 46,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Slide 2 — rute dari lokasi pasien ke rumah sakit
-class _DriverIllustration2 extends StatelessWidget {
-  const _DriverIllustration2();
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Positioned.fill(child: CustomPaint(painter: _RoutePainter())),
-        // pin lokasi pasien
-        const Positioned(
-          left: 38,
-          top: 136,
-          child: Icon(Icons.location_on_rounded, color: _kBlue, size: 46),
-        ),
-        // ambulans kecil
-        Positioned(
-          left: 128,
-          top: 148,
-          child: Transform.rotate(angle: -0.25, child: const _MiniAmbulance()),
-        ),
-        // rumah sakit
-        const Positioned(left: 196, top: 52, child: _Hospital()),
-      ],
-    );
-  }
-}
-
-class _RoutePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final path = Path()
-      ..moveTo(64, 196)
-      ..cubicTo(96, 232, 140, 214, 168, 190)
-      ..cubicTo(196, 166, 212, 176, 232, 146)
-      ..cubicTo(244, 128, 232, 118, 224, 112);
-
-    canvas.drawPath(
-      path.shift(const Offset(0, 4)),
-      Paint()
-        ..color = _kBlue.withAlpha(40)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 9
-        ..strokeCap = StrokeCap.round,
-    );
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = _kBlue
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 7
-        ..strokeCap = StrokeCap.round,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _MiniAmbulance extends StatelessWidget {
-  const _MiniAmbulance();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 56,
-      height: 40,
-      child: Stack(
-        children: [
-          Positioned(
-            left: 20,
-            top: 0,
-            child: Container(
-              width: 14,
-              height: 5,
-              decoration: BoxDecoration(
-                color: _kRed,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            top: 4,
-            height: 26,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: const Color(0xFFD5DEE8)),
-              ),
-            ),
-          ),
-          Positioned(
-            left: 1,
-            right: 1,
-            top: 22,
-            height: 4,
-            child: Container(color: _kRed),
-          ),
-          const Positioned(
-            left: 8,
-            top: 7,
-            child: Icon(Icons.add_rounded, color: _kRed, size: 16),
-          ),
-          Positioned(
-            right: 5,
-            top: 8,
-            child: Container(
-              width: 14,
-              height: 10,
-              decoration: BoxDecoration(
-                color: const Color(0xFF9CC9F0),
-                borderRadius: BorderRadius.circular(3),
-              ),
-            ),
-          ),
-          for (final x in [8.0, 38.0])
-            Positioned(
-              left: x,
-              top: 24,
-              child: Container(
-                width: 11,
-                height: 11,
-                decoration: BoxDecoration(
-                  color: _kInk,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 1.5),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Hospital extends StatelessWidget {
-  const _Hospital();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 64,
-      height: 64,
-      child: Stack(
-        children: [
-          // papan atas
-          Positioned(
-            left: 18,
-            top: 0,
-            child: Container(
-              width: 28,
-              height: 18,
-              decoration: BoxDecoration(
-                color: _kGreen,
-                borderRadius: BorderRadius.circular(5),
-                border: Border.all(color: Colors.white, width: 2),
-              ),
-              child: const Icon(
-                Icons.add_rounded,
-                color: Colors.white,
-                size: 14,
-              ),
-            ),
-          ),
-          // gedung
-          Positioned(
-            left: 0,
-            right: 0,
-            top: 16,
-            bottom: 0,
-            child: Container(
-              decoration: BoxDecoration(
-                color: _kGreen,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-              child: Column(
-                children: [
-                  for (int r = 0; r < 2; r++) ...[
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: List.generate(
-                        3,
-                        (_) => Container(
-                          width: 11,
-                          height: 9,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withAlpha(230),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
