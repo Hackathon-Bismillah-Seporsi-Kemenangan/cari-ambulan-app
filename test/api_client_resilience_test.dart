@@ -6,7 +6,8 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:cari_ambulan/core/network/api_client.dart';
 
-ApiClient _api(MockClient c) => ApiClient(client: c, baseUrl: 'http://api.test');
+ApiClient _api(MockClient c) =>
+    ApiClient(client: c, baseUrl: 'http://api.test');
 
 void main() {
   test('a GET that fails once is retried and succeeds', () async {
@@ -15,7 +16,12 @@ void main() {
       MockClient((_) async {
         calls++;
         if (calls == 1) throw http.ClientException('connection reset');
-        return http.Response(jsonEncode({'data': {'status': 'searching'}}), 200);
+        return http.Response(
+          jsonEncode({
+            'data': {'status': 'searching'},
+          }),
+          200,
+        );
       }),
     );
 
@@ -82,8 +88,11 @@ void main() {
     await expectLater(
       api.post('x'),
       throwsA(
-        isA<ApiException>()
-            .having((ApiException e) => e.statusCode, 'statusCode', 500),
+        isA<ApiException>().having(
+          (ApiException e) => e.statusCode,
+          'statusCode',
+          500,
+        ),
       ),
     );
   });

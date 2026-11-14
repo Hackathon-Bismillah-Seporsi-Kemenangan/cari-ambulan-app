@@ -113,7 +113,9 @@ class ApiClient {
         final r = await http.Response.fromStream(
           await _client.send(_copy(request)).timeout(timeout),
         );
-        if (isGet && attempt < attempts && _retryStatuses.contains(r.statusCode)) {
+        if (isGet &&
+            attempt < attempts &&
+            _retryStatuses.contains(r.statusCode)) {
           AppLog.warn('API', '$call → ${r.statusCode}, retrying');
           await Future<void>.delayed(const Duration(milliseconds: 250));
           continue;
@@ -125,7 +127,7 @@ class ApiClient {
         AppLog.warn(
           'API',
           '$call → timeout after ${watch.elapsedMilliseconds} ms'
-          '${attempt < attempts ? ', retrying' : ''}',
+              '${attempt < attempts ? ', retrying' : ''}',
         );
       } on SocketException catch (e) {
         failure = e;

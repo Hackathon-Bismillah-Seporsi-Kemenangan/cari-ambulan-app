@@ -34,7 +34,8 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     // A new order for a driver whose app is closed; they have ~30 s.
     await EmergencyAlert.start(
       title: 'Order darurat baru',
-      body: 'Ada pasien membutuhkan ambulans di dekat Anda. Ketuk untuk melihat.',
+      body:
+          'Ada pasien membutuhkan ambulans di dekat Anda. Ketuk untuk melihat.',
       background: true,
       data: Map<String, dynamic>.from(data),
     );
@@ -69,7 +70,10 @@ class FcmService {
         sound: true,
         provisional: false,
       );
-      AppLog.info('FCM', 'Notification permission status: ${settings.authorizationStatus}');
+      AppLog.info(
+        'FCM',
+        'Notification permission status: ${settings.authorizationStatus}',
+      );
 
       // Handle foreground messages
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
@@ -86,7 +90,10 @@ class FcmService {
       // Check if opened from a terminated state
       final initialMessage = await messaging.getInitialMessage();
       if (initialMessage != null) {
-        AppLog.info('FCM', 'App launched from terminated notification: ${initialMessage.data}');
+        AppLog.info(
+          'FCM',
+          'App launched from terminated notification: ${initialMessage.data}',
+        );
         _handleMessage(initialMessage);
       }
 
@@ -138,7 +145,9 @@ class FcmService {
   static void _handleMessage(RemoteMessage message) => _dispatch(message.data);
 
   static void _dispatch(Map<String, dynamic> data) {
-    if (data['type'] == 'incoming_call' || data.containsKey('call_id') || data.containsKey('id')) {
+    if (data['type'] == 'incoming_call' ||
+        data.containsKey('call_id') ||
+        data.containsKey('id')) {
       final call = IncomingCall.fromJson(data);
       if (call.id.isEmpty) return;
       // The call panel takes over from the ringing notification.
@@ -152,4 +161,3 @@ class FcmService {
     }
   }
 }
-

@@ -12,7 +12,8 @@ enum LiveKitCallConnectionState {
   failed,
 }
 
-typedef OnLiveKitConnectionState = void Function(LiveKitCallConnectionState state);
+typedef OnLiveKitConnectionState =
+    void Function(LiveKitCallConnectionState state);
 typedef OnLiveKitParticipantEvent = void Function(String participantId);
 
 class LiveKitVoiceService {
@@ -29,17 +30,12 @@ class LiveKitVoiceService {
   OnLiveKitParticipantEvent? onParticipantJoined;
   OnLiveKitParticipantEvent? onParticipantLeft;
 
-  Future<void> connect({
-    required String url,
-    required String token,
-  }) async {
+  Future<void> connect({required String url, required String token}) async {
     await dispose();
 
     final room = _room = Room(
       roomOptions: const RoomOptions(
-        defaultAudioPublishOptions: AudioPublishOptions(
-          dtx: true,
-        ),
+        defaultAudioPublishOptions: AudioPublishOptions(dtx: true),
       ),
     );
 
@@ -59,21 +55,33 @@ class LiveKitVoiceService {
         onConnectionState?.call(LiveKitCallConnectionState.connected);
       })
       ..on<RoomDisconnectedEvent>((event) {
-        AppLog.info('LiveKit', 'Disconnected from room: ${room.name} reason: ${event.reason}');
+        AppLog.info(
+          'LiveKit',
+          'Disconnected from room: ${room.name} reason: ${event.reason}',
+        );
         onConnectionState?.call(LiveKitCallConnectionState.disconnected);
       })
       ..on<ParticipantConnectedEvent>((event) {
-        AppLog.info('LiveKit', 'Participant joined: ${event.participant.identity}');
+        AppLog.info(
+          'LiveKit',
+          'Participant joined: ${event.participant.identity}',
+        );
         onParticipantJoined?.call(event.participant.identity);
         onConnectionState?.call(LiveKitCallConnectionState.connected);
       })
       ..on<ParticipantDisconnectedEvent>((event) {
-        AppLog.info('LiveKit', 'Participant left: ${event.participant.identity}');
+        AppLog.info(
+          'LiveKit',
+          'Participant left: ${event.participant.identity}',
+        );
         onParticipantLeft?.call(event.participant.identity);
       })
       ..on<TrackSubscribedEvent>((event) {
         if (event.track is AudioTrack) {
-          AppLog.info('LiveKit', 'Remote audio track subscribed: ${event.track.sid}');
+          AppLog.info(
+            'LiveKit',
+            'Remote audio track subscribed: ${event.track.sid}',
+          );
           onConnectionState?.call(LiveKitCallConnectionState.connected);
         }
       });
@@ -125,4 +133,3 @@ class LiveKitVoiceService {
     }
   }
 }
-

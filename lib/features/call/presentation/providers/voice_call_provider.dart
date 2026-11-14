@@ -83,16 +83,21 @@ class VoiceCallNotifier extends Notifier<VoiceCallState> {
         throw StateError('Gagal membuat panggilan.');
       }
 
-      final token = data?['token'] as String? ??
+      final token =
+          data?['token'] as String? ??
           data?['livekit_token'] as String? ??
           (data?['connection'] as Map<String, dynamic>?)?['token'] as String?;
-      final livekitUrl = data?['url'] as String? ??
+      final livekitUrl =
+          data?['url'] as String? ??
           data?['livekit_url'] as String? ??
-          (data?['connection'] as Map<String, dynamic>?)?['server_url'] as String? ??
+          (data?['connection'] as Map<String, dynamic>?)?['server_url']
+              as String? ??
           ApiConfig.livekitUrl;
-      final roomName = data?['room_name'] as String? ??
+      final roomName =
+          data?['room_name'] as String? ??
           data?['room'] as String? ??
-          (data?['connection'] as Map<String, dynamic>?)?['room_name'] as String?;
+          (data?['connection'] as Map<String, dynamic>?)?['room_name']
+              as String?;
 
       _handledCalls.add(callId);
       state = state.copyWith(
@@ -213,22 +218,27 @@ class VoiceCallNotifier extends Notifier<VoiceCallState> {
     try {
       Map<String, dynamic>? data;
       try {
-        final res =
-            await ref.read(apiClientProvider).post('calls/$callId/accept');
+        final res = await ref
+            .read(apiClientProvider)
+            .post('calls/$callId/accept');
         data = res?['data'] as Map<String, dynamic>? ?? res;
       } catch (_) {
-        final res =
-            await ref.read(apiClientProvider).post('calls/$callId/answer');
+        final res = await ref
+            .read(apiClientProvider)
+            .post('calls/$callId/answer');
         data = res?['data'] as Map<String, dynamic>? ?? res;
       }
 
-      final token = data?['token'] as String? ??
+      final token =
+          data?['token'] as String? ??
           data?['livekit_token'] as String? ??
           (data?['connection'] as Map<String, dynamic>?)?['token'] as String? ??
           state.token;
-      final url = data?['url'] as String? ??
+      final url =
+          data?['url'] as String? ??
           data?['livekit_url'] as String? ??
-          (data?['connection'] as Map<String, dynamic>?)?['server_url'] as String? ??
+          (data?['connection'] as Map<String, dynamic>?)?['server_url']
+              as String? ??
           state.livekitUrl ??
           ApiConfig.livekitUrl;
 

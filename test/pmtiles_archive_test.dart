@@ -86,7 +86,13 @@ void main() {
 
   test('map coverage is East Java', () {
     expect(MapTiles.covers(const LatLng(-8.1724, 113.7008)), isTrue); // Jember
-    expect(MapTiles.covers(const LatLng(-7.2575, 112.7521)), isTrue); // Surabaya
-    expect(MapTiles.covers(const LatLng(-6.2088, 106.8456)), isFalse); // Jakarta
+    expect(
+      MapTiles.covers(const LatLng(-7.2575, 112.7521)),
+      isTrue,
+    ); // Surabaya
+    expect(
+      MapTiles.covers(const LatLng(-6.2088, 106.8456)),
+      isFalse,
+    ); // Jakarta
   });
 }

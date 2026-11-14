@@ -46,10 +46,7 @@ void main() {
     expect(find.text('Andi Pratama'), findsOneWidget);
     expect(find.textContaining('RSUD Dr. Soebandi · Diserahkan'), findsOne);
     expect(find.text('Sesak Nafas · #CA-MOCK02'), findsOneWidget);
-    expect(
-      find.textContaining('Pasien sudah dibawa keluarga'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('Pasien sudah dibawa keluarga'), findsOneWidget);
     // One of each, in the summary and on the cards.
     expect(find.text('Selesai'), findsNWidgets(2));
     expect(find.text('Dibatalkan'), findsNWidgets(2));
