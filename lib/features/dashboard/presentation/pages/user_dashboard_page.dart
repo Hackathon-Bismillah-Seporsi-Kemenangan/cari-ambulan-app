@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../onboarding/data/onboarding_repository.dart';
 import '../../../../main.dart';
+import '../../../../core/widgets/brand_mark.dart';
 
 const _kBlue = Color(0xFF1565C0);
 const _kRed = Color(0xFFE53935);
@@ -75,22 +76,10 @@ class _UserDashboardPageState extends State<UserDashboardPage>
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: _kRed,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.add_rounded,
-                  color: Colors.white,
-                  size: 22,
-                ),
-              ),
+              const BrandMark(size: 28),
               const SizedBox(width: 8),
               const Text(
-                'SigapMed',
+                'CariAmbulan',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
@@ -491,7 +480,7 @@ class _UserDashboardPageState extends State<UserDashboardPage>
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 20),
               child: Text(
-                'Layanan SigapMed',
+                'Layanan CariAmbulan',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,

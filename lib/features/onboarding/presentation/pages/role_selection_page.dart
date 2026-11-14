@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/user_role.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/brand_mark.dart';
 
 const _border = Color(0xFFE5E7EB);
 
@@ -189,7 +190,7 @@ class _RoleSelectionPageState extends State<RoleSelectionPage>
   }
 }
 
-/// The red cross tile and "SigapMed".
+/// The logo and "CariAmbulan".
 class _Brand extends StatelessWidget {
   const _Brand();
 
@@ -197,15 +198,7 @@ class _Brand extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: AppColors.emergency,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: const Icon(Icons.add_rounded, color: Colors.white, size: 30),
-        ),
+        const BrandMark(size: 40),
         const SizedBox(width: 12),
         const Flexible(
           child: Text(
