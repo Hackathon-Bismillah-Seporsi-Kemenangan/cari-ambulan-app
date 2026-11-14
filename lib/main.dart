@@ -32,7 +32,7 @@ class CariAmbulanApp extends ConsumerWidget {
     return MaterialApp(
       // A session change disposes all routes, including pushed forms/trip pages.
       key: ValueKey((user?.id, user?.isDriver, user?.isUser)),
-      title: 'SigapMed',
+      title: 'CariAmbulan',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       home: const AuthGate(),
@@ -40,7 +40,7 @@ class CariAmbulanApp extends ConsumerWidget {
   }
 }
 
-/// Restore the session first, then introduce signed-out users to SigapMed.
+/// Restore the session first, then introduce signed-out users to CariAmbulan.
 class AuthGate extends ConsumerWidget {
   const AuthGate({super.key});
 

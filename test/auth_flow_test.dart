@@ -139,7 +139,7 @@ void main() {
       await _tap(tester, 'Atur nanti');
 
       expect(find.byType(LoginPage), findsOneWidget);
-      expect(find.text('Masuk ke SigapMed'), findsOneWidget);
+      expect(find.text('Masuk ke CariAmbulan'), findsOneWidget);
       expect(find.byType(DriverShell), findsNothing);
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getBool('onboarding_done'), isTrue);
@@ -393,7 +393,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       await _tap(tester, 'Daftar');
-      expect(find.text('Buat akun SigapMed'), findsOneWidget);
+      expect(find.text('Buat akun CariAmbulan'), findsOneWidget);
       expect(find.byKey(const ValueKey('register_license')), findsNothing);
       await _fillRegistration(tester, password: 'short');
       await _tap(tester, 'Daftar');

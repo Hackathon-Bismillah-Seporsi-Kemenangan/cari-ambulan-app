@@ -1,9 +1,9 @@
-/// App string constants for SigapMed
+/// App string constants for CariAmbulan
 class AppStrings {
   AppStrings._();
 
-  static const String appName = 'SigapMed';
-  static const String driverAppName = 'SigapMed Driver';
+  static const String appName = 'CariAmbulan';
+  static const String driverAppName = 'CariAmbulan Driver';
 
   // Role Selection
   static const String roleSelectionTitle = 'Pilih peran Anda';

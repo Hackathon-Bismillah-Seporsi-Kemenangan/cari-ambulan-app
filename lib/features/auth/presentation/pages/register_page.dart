@@ -10,7 +10,7 @@ import '../providers/auth_provider.dart';
 import '../widgets/auth_form_validators.dart';
 import '../widgets/auth_page_layout.dart';
 
-/// "Buat akun SigapMed" for patients; for drivers two steps, their own
+/// "Buat akun CariAmbulan" for patients; for drivers two steps, their own
 /// data then the ambulance ("Data ambulans").
 class RegisterPage extends ConsumerStatefulWidget {
   const RegisterPage({
@@ -149,7 +149,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     return AuthPageLayout(
       isDriver: _isDriver,
       step: _isDriver ? 'LANGKAH 1 DARI 2' : null,
-      title: _isDriver ? 'Daftar sebagai Driver' : 'Buat akun SigapMed',
+      title: _isDriver ? 'Daftar sebagai Driver' : 'Buat akun CariAmbulan',
       onBack: _back,
       isBusy: _isSubmitting,
       footer: Column(

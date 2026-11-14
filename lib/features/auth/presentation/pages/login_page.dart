@@ -75,9 +75,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final isDriver = widget.role.isDriver;
     return AuthPageLayout(
       isDriver: isDriver,
-      title: isDriver ? 'Masuk sebagai Driver' : 'Masuk ke SigapMed',
+      title: isDriver ? 'Masuk sebagai Driver' : 'Masuk ke CariAmbulan',
       subtitle: isDriver
-          ? 'Masuk dengan email yang Anda daftarkan di SigapMed.'
+          ? 'Masuk dengan email yang Anda daftarkan di CariAmbulan.'
           : 'Masuk dengan email dan kata sandi Anda.',
       onBack: widget.onChangeRole,
       isBusy: _isSubmitting,

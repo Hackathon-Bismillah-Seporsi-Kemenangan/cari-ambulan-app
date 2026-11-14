@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// App color palette for SigapMed
+/// App color palette for CariAmbulan
 class AppColors {
   AppColors._();
 

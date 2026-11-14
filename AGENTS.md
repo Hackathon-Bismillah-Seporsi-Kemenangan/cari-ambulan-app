@@ -4,7 +4,7 @@ Instructions for any AI coding agent (Claude Code, Codex, Cursor, Gemini, Copilo
 
 ## 1. What this is
 
-One Flutter app (brand name in UI: **SigapMed**) for two roles of the CariAmbulan ambulance dispatch service:
+One Flutter app (brand name in UI: **CariAmbulan**) for two roles of the CariAmbulan ambulance dispatch service:
 
 - **driver** → `DriverShell`: go online, receive emergency offers, drive to patient, then to hospital IGD.
 - **user** (patient / reporter) → `UserShell`: call an ambulance, watch the search, track the ambulance, Medical ID, history.

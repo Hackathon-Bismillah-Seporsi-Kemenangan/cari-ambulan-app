@@ -23,7 +23,7 @@ void main() {
     await tester.pumpWidget(testApp(user: null));
     await tester.pumpAndSettle();
 
-    expect(find.text('SigapMed'), findsOneWidget);
+    expect(find.text('CariAmbulan'), findsOneWidget);
     expect(find.text('Pilih peran Anda'), findsOneWidget);
     expect(find.text('Pasien atau keluarga'), findsOneWidget);
     expect(find.text('Pengemudi ambulans'), findsOneWidget);
@@ -41,7 +41,7 @@ void main() {
     await tester.pumpWidget(testApp(user: null));
     await tester.pumpAndSettle();
 
-    expect(find.text('Masuk ke SigapMed'), findsOneWidget);
+    expect(find.text('Masuk ke CariAmbulan'), findsOneWidget);
     expect(find.text('Masuk'), findsOneWidget);
     expect(find.text('Daftar'), findsOneWidget);
   });
