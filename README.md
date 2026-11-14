@@ -295,3 +295,7 @@ User app, compared to `User App.png`:
 - Calls only arrive **while the app is open** (polling). Push notifications (FCM / Laravel Reverb) are planned.
 - Public OpenFreeMap/OSRM servers are fine for development but not guaranteed for production.
 - The `spec/` folder is local-only (git-ignored).
+
+## License
+
+This project is licensed under the [VIEW ONLY LICENSE](LICENSE).
